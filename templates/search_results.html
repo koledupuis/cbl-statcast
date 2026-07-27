@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Search &middot; CBL Stats{% endblock %}
+{% block content %}
+<div class="section-title">Search Results</div>
+<div class="section-sub">"{{ q }}"</div>
+
+{% if not results %}
+  <div class="empty-state">No players found. Try a different name.</div>
+{% else %}
+<table class="stat-table">
+  <thead><tr><th>Player</th><th>Team</th><th>Position</th></tr></thead>
+  <tbody>
+    {% for r in results %}
+    <tr>
+      <td><a class="player-link" href="{{ url_for('player_page', player_id=r.playerId) }}">{{ r.fullName }}</a></td>
+      <td class="team-tag"><a href="{{ url_for('team_roster', team_name=r.teamName) }}">{{ r.teamName }}</a></td>
+      <td>{{ r.position }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

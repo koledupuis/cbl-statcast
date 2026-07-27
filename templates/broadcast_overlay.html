@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>CBL Broadcast Overlay</title>
+<style>
+  /* Fully transparent everywhere except the panels below -- this is
+     meant to sit as a browser-source layer over the actual game video
+     in OBS/vMix/whatever, so the video shows through anywhere this
+     page itself has no content. Right column = scoreboard + inning/
+     outs/bases + now-pitching + pitcher splits, all stacked. Bottom
+     bar = current batter, full width, packed with splits. */
+  html, body {
+    margin: 0; padding: 0; width: 100vw; height: 100vh;
+    background: transparent; overflow: hidden;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #F4E7E2;
+  }
+  * { box-sizing: border-box; }
+
+  .panel {
+    position: fixed;
+    background: rgba(16, 11, 10, 0.90);
+    border: 1px solid rgba(194, 74, 58, 0.5);
+  }
+
+  /* ---- shared mini split-table styling ---- */
+  .mini-label {
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #C24A3A;
+    font-weight: 700; margin-top: 6px; margin-bottom: 2px;
+  }
+  table.mini-table { width: 100%; border-collapse: collapse; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+  table.mini-table th, table.mini-table td { padding: 2px 5px; text-align: center; white-space: nowrap; }
+  table.mini-table th { color: #C9B6AE; font-weight: 600; font-size: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+  table.mini-table td:first-child, table.mini-table th:first-child { text-align: left; font-weight: 700; padding-left: 0; }
+  table.mini-table tbody tr:nth-child(odd) { background: rgba(255,255,255,0.035); }
+  table.mini-table td.hero { color: #E8B84B; font-weight: 800; }
+
+  /* ---- right column: scoreboard + now-pitching + due-up, stacked ---- */
+  #rightcol {
+    top: 0; right: 0; width: 380px;
+    display: flex; flex-direction: column;
+    border-top: none; border-right: none;
+    max-height: calc(100vh - 300px); /* never reach into the batter-card strip below */
+    overflow-y: auto; /* scroll rather than silently clip if content ever runs long */
+  }
+  #scoreboard { padding: 16px 16px 12px; flex-shrink: 0; }
+  #pitchingpanel {
+    padding: 12px 16px 16px; border-top: 1px solid rgba(194, 74, 58, 0.35); flex-shrink: 0;
+  }
+  #scoreboard .team-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.12);
+  }
+  #scoreboard .team-row:last-of-type { border-bottom: none; }
+  #scoreboard .team-name { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
+  #scoreboard .team-score { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; color: #C24A3A; }
+  #scoreboard .team-score.leading { color: #E8B84B; }
+
+  /* status + outs + bases, side by side to kill dead space */
+  #scoreboard .state-row {
+    margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  #scoreboard .state-left { text-align: left; }
+  #scoreboard .game-status {
+    font-size: 13px; color: #C9B6AE; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 700;
+  }
+  #scoreboard .outs-dots { display: flex; gap: 6px; margin-top: 6px; }
+  #scoreboard .out-dot {
+    width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #C24A3A; background: transparent;
+  }
+  #scoreboard .out-dot.filled { background: #C24A3A; }
+  #scoreboard .count-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  #scoreboard .count-text { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: #F4E7E2; }
+  #scoreboard .count-label { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: #C9B6AE; }
+  #scoreboard .bs-dots { display: flex; flex-direction: column; gap: 3px; }
+  #scoreboard .bs-dots .dot-line { display: flex; gap: 4px; }
+  #scoreboard .bs-dots .b-dot, #scoreboard .bs-dots .s-dot {
+    width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid;
+  }
+  #scoreboard .bs-dots .b-dot { border-color: #4A9B8E; background: transparent; }
+  #scoreboard .bs-dots .b-dot.filled { background: #4A9B8E; }
+  #scoreboard .bs-dots .s-dot { border-color: #C24A3A; background: transparent; }
+  #scoreboard .bs-dots .s-dot.filled { background: #C24A3A; }
+
+  /* ---- current at-bat pitch sequence (lives in the pitching panel) ---- */
+  #pitchingpanel .pitchseq-row { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+  #pitchingpanel .pitch-chip {
+    width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 800; color: #100B0A; flex-shrink: 0;
+  }
+  #pitchingpanel .pitch-chip.ball { background: #4A9B8E; }
+  #pitchingpanel .pitch-chip.strike { background: #C24A3A; color: #F4E7E2; }
+  #pitchingpanel .pitch-chip.foul { background: #E8B84B; }
+  #pitchingpanel .pitch-chip.other { background: #8B6F5C; color: #F4E7E2; }
+  #scoreboard .diamond-wrap { flex-shrink: 0; }
+  #scoreboard .linescore {
+    margin-top: 14px; width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums;
+  }
+  #scoreboard .linescore th, #scoreboard .linescore td {
+    padding: 4px 5px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  #scoreboard .linescore th { color: #C9B6AE; font-weight: 600; }
+  #scoreboard .linescore td:first-child, #scoreboard .linescore th:first-child {
+    text-align: left; font-weight: 700;
+  }
+
+  /* ---- now-pitching section (bottom of the right column) ---- */
+  #pitchingpanel .label {
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #C24A3A; font-weight: 700; margin-bottom: 6px;
+  }
+  #pitchingpanel .pitcher-row { display: flex; gap: 12px; align-items: center; }
+  #pitchingpanel .headshot-sm {
+    width: 52px; height: 52px; border-radius: 5px; object-fit: cover; flex-shrink: 0;
+    border: 2px solid #C24A3A; background: rgba(255,255,255,0.06);
+  }
+  #pitchingpanel .name { font-size: 16px; font-weight: 800; line-height: 1.2; }
+  #pitchingpanel .meta { font-size: 12px; color: #C9B6AE; }
+  #pitchingpanel .stat-row { display: flex; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
+  #pitchingpanel .stat .v { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  #pitchingpanel .stat .k { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: #C9B6AE; }
+  .today-row {
+    margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,0.1);
+    display: flex; justify-content: space-between; font-size: 12px; color: #C9B6AE;
+  }
+  .today-row b { color: #F4E7E2; font-variant-numeric: tabular-nums; }
+
+  /* ---- bottom current-batter panel ---- */
+  #battercard {
+    left: 0; right: 0; bottom: 0; height: 300px;
+    display: flex; align-items: stretch; gap: 18px; padding: 14px 24px;
+    overflow: hidden; /* guarantee nothing spills past 1080px -- see .batter-info below */
+  }
+  #battercard .headshot {
+    width: 150px; height: 150px; border-radius: 6px; object-fit: cover; flex-shrink: 0;
+    border: 2px solid #C24A3A; background: rgba(255,255,255,0.06); align-self: center;
+  }
+  #battercard .headshot.placeholder { display: flex; align-items: center; justify-content: center; font-size: 13px; color: #7C645B; }
+  #battercard .batter-info { flex: 1 1 320px; min-width: 260px; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  #battercard .now-batting-label {
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #C24A3A; font-weight: 700; margin-bottom: 1px;
+  }
+  #battercard .batter-name { font-size: 23px; font-weight: 800; line-height: 1.15; }
+  #battercard .batter-meta { font-size: 12px; color: #C9B6AE; margin-top: 1px; }
+  #battercard .stat-row { display: flex; gap: 18px; margin-top: 6px; flex-wrap: wrap; }
+  #battercard .stat { text-align: left; }
+  #battercard .stat .v { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  #battercard .stat .k { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: #C9B6AE; }
+
+  /* ---- pie charts (recent outcomes, contact quality) -- larger, legend beside not below ---- */
+  #battercard .charts {
+    display: flex; gap: 18px; margin-left: auto; flex-shrink: 0; align-items: center;
+    flex-wrap: wrap; max-width: 480px; justify-content: flex-end;
+  }
+  #battercard .qpa-label { font-size: 9px; color: #7C645B; margin-top: 2px; text-align: center; }
+  #battercard .chart-block { display: flex; align-items: center; gap: 10px; text-align: left; }
+  #battercard .chart-block .chart-title {
+    font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: #C9B6AE; margin-bottom: 5px;
+  }
+  #battercard .legend { display: flex; flex-direction: column; gap: 3px; font-size: 10.5px; text-align: left; }
+  #battercard .legend .li { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  #battercard .legend .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ---- split bar chart (vs LHP/RHP, RISP, etc) -- third chart block,
+     same row as the two donut charts, all sharing platoon/situational
+     data already fetched for the text splits table ---- */
+  .barchart-block { display: flex; flex-direction: column; min-width: 155px; }
+  .barchart-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+  .barchart-label {
+    font-size: 9.5px; color: #C9B6AE; width: 68px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .barchart-track {
+    flex: 1; height: 9px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;
+  }
+  .barchart-fill { height: 100%; border-radius: 3px; }
+  .barchart-value {
+    font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; width: 34px; text-align: right; flex-shrink: 0;
+  }
+
+  .hidden-msg {
+    position: fixed; bottom: 20px; left: 20px; font-size: 12px; color: rgba(255,255,255,0.4);
+  }
+
+  /* ---- flash-on-change animation -- applied briefly whenever score,
+     count, or the current batter changes, so a live update actually
+     reads as "something just happened" instead of silently swapping
+     text. Kept subtle (background pulse, not motion) since this sits
+     directly in the broadcast frame. ---- */
+  @keyframes flashPulse {
+    0%   { background: rgba(232, 184, 75, 0.55); }
+    100% { background: rgba(232, 184, 75, 0); }
+  }
+  .flash { animation: flashPulse 1.1s ease-out; border-radius: 3px; }
+
+  /* ---- rotating league-leader banner (scoreboard) ---- */
+  #leaderbanner {
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);
+    min-height: 34px; display: flex; align-items: center; gap: 8px;
+  }
+  #leaderbanner .trophy { font-size: 14px; flex-shrink: 0; }
+  #leaderbanner .leader-text { font-size: 11.5px; line-height: 1.3; }
+  #leaderbanner .leader-text b { color: #E8B84B; }
+  #leaderbanner .leader-label { font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: #C9B6AE; }
+
+  /* ---- due up strip (right column, below pitching panel) ---- */
+  #dueup {
+    padding: 10px 16px 14px; border-top: 1px solid rgba(194, 74, 58, 0.35); flex-shrink: 0;
+  }
+  #dueup .label {
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #C24A3A; font-weight: 700; margin-bottom: 8px;
+  }
+  #dueup .dueup-row { display: flex; gap: 10px; }
+  #dueup .dueup-item { flex: 1; text-align: center; min-width: 0; }
+  #dueup .dueup-item .headshot-xs {
+    width: 44px; height: 44px; border-radius: 5px; object-fit: cover; margin: 0 auto 4px;
+    border: 1.5px solid rgba(194, 74, 58, 0.6); background: rgba(255,255,255,0.06); display: block;
+  }
+  #dueup .dueup-item .name {
+    font-size: 10px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #dueup .dueup-item .stat { font-size: 9px; color: #C9B6AE; font-variant-numeric: tabular-nums; }
+  #dueup .dueup-item .on-deck-tag {
+    font-size: 8px; letter-spacing: 0.06em; text-transform: uppercase; color: #E8B84B; font-weight: 700; margin-bottom: 2px;
+  }
+
+  /* ---- pitcher today pitch-mix chart ---- */
+  #pitchingpanel .pitchmix-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  #pitchingpanel .pitchmix-legend { display: flex; flex-direction: column; gap: 2px; font-size: 9.5px; }
+  #pitchingpanel .pitchmix-legend .li { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  #pitchingpanel .pitchmix-legend .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div id="rightcol" class="panel">
+  <div id="scoreboard"></div>
+  <div id="pitchingpanel"></div>
+  <div id="dueup"></div>
+</div>
+<div id="battercard" class="panel"></div>
+<div id="statusmsg" class="hidden-msg"></div>
+
+<script>
+const GAME_ID = {{ public_game_id|tojson }};
+
+// ---- flash-on-change tracking: remembers the last-rendered value for
+// a handful of fields so render functions can tell "did this just
+// change" and apply the .flash animation class -- null on first render
+// means "nothing to compare against yet," so nothing flashes on the
+// very first paint (would be a false positive, not a real change).
+const prevRendered = { awayScore: null, homeScore: null, count: null, batterId: null, pitcherId: null };
+
+// ---- rotating league-leader banner: its own independent timer, since
+// cycling through leaders every ~7s is a completely different cadence
+// than the 1s render tick / 2s poll tick above -- those are about
+// freshness of live data, this is purely a display rotation.
+let leaderRotationIndex = 0;
+setInterval(() => { leaderRotationIndex++; }, 7000);
+
+function outsDots(n) {
+  n = n || 0;
+  let html = '';
+  for (let i = 0; i < 3; i++) html += `<div class="out-dot${i < n ? ' filled' : ''}"></div>`;
+  return html;
+}
+
+function ballStrikeDots(balls, strikes) {
+  balls = balls || 0; strikes = strikes || 0;
+  let b = '<div class="dot-line">';
+  for (let i = 0; i < 4; i++) b += `<div class="b-dot${i < balls ? ' filled' : ''}"></div>`;
+  b += '</div>';
+  let s = '<div class="dot-line">';
+  for (let i = 0; i < 3; i++) s += `<div class="s-dot${i < strikes ? ' filled' : ''}"></div>`;
+  s += '</div>';
+  return `<div class="bs-dots">${b}${s}</div>`;
+}
+
+function fmt3(v) { return (v === null || v === undefined) ? '---' : v.toFixed(3).replace(/^0\./, '.'); }
+function fmt2(v) { return (v === null || v === undefined) ? '---' : v.toFixed(2); }
+
+// Compact bases-loaded diamond icon -- home at the bottom, 1st on the
+// right, 2nd at top, 3rd on the left (the standard broadcast-graphic
+// orientation), each base lit up gold when occupied.
+function basesDiamond(bases, size) {
+  size = size || 46;
+  const cx = size / 2, cy = size / 2 + 2, r = size * 0.34;
+  const on = (k) => (bases && bases[k]) ? '#E8B84B' : 'rgba(255,255,255,0.10)';
+  const stroke = (k) => (bases && bases[k]) ? '#E8B84B' : 'rgba(255,255,255,0.35)';
+  const pts = { second: [cx, cy - r], first: [cx + r, cy], third: [cx - r, cy] };
+  const sq = size * 0.30;
+  const sq2 = sq / 2;
+  function base(key) {
+    const [x, y] = pts[key];
+    return `<rect x="${x - sq2}" y="${y - sq2}" width="${sq}" height="${sq}" fill="${on(key)}"
+      stroke="${stroke(key)}" stroke-width="1.5" transform="rotate(45 ${x} ${y})" />`;
+  }
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    ${base('second')}${base('third')}${base('first')}
+  </svg>`;
+}
+
+function leaderBannerHtml(state) {
+  const leaders = state.leaders || [];
+  if (!leaders.length) return '';
+  const entry = leaders[leaderRotationIndex % leaders.length];
+  const value = entry.is_rate ? fmt3(entry.value) : (entry.value ?? '');
+  const rankText = entry.rank === 1 ? 'leads the league' : `is #${entry.rank} in the league`;
+  return `
+    <div id="leaderbanner">
+      <span class="trophy">\u{1F3C6}</span>
+      <div class="leader-text">
+        <div class="leader-label">${entry.label}</div>
+        <b>${entry.player}</b> (${entry.team}) ${rankText}: <b>${value}</b>
+      </div>
+    </div>`;
+}
+
+function renderScoreboard(state) {
+  const el = document.getElementById('scoreboard');
+  if (!state.found) {
+    el.innerHTML = `<div class="game-status">No live game found for<br>"${GAME_ID}"</div>`;
+    return;
+  }
+  const homeLead = state.home_score > state.away_score;
+  const awayLead = state.away_score > state.home_score;
+
+  // Flash whenever a score or the ball-strike count actually changes
+  // from what was last rendered -- null on the very first render means
+  // "nothing to compare yet," so nothing false-flashes on initial paint.
+  const awayFlash = prevRendered.awayScore !== null && prevRendered.awayScore !== state.away_score;
+  const homeFlash = prevRendered.homeScore !== null && prevRendered.homeScore !== state.home_score;
+  const countKey = `${state.balls ?? 0}-${state.strikes ?? 0}`;
+  const countFlash = prevRendered.count !== null && prevRendered.count !== countKey;
+  prevRendered.awayScore = state.away_score;
+  prevRendered.homeScore = state.home_score;
+  prevRendered.count = countKey;
+
+  let lineScoreRows = '';
+  if (state.inning_scores && state.inning_scores.length) {
+    const innings = state.inning_scores.map(s => s.inning);
+    lineScoreRows = `
+      <table class="linescore">
+        <thead><tr><th></th>${innings.map(i => `<th>${i}</th>`).join('')}</tr></thead>
+        <tbody>
+          <tr><td>${state.away_team || 'Away'}</td>${state.inning_scores.map(s => `<td>${s.away}</td>`).join('')}</tr>
+          <tr><td>${state.home_team || 'Home'}</td>${state.inning_scores.map(s => `<td>${s.home}</td>`).join('')}</tr>
+        </tbody>
+      </table>`;
+  }
+
+  const stateRow = !state.is_game_over ? `
+    <div class="state-row">
+      <div class="state-left">
+        <div class="game-status">${(state.half_inning === 'top' ? 'Top' : 'Bot') + ' ' + (state.inning || '')}</div>
+        <div class="outs-dots">${outsDots(state.outs)}</div>
+        <div class="count-row${countFlash ? ' flash' : ''}">
+          <span class="count-text">${countKey}</span>
+          <span class="count-label">Count</span>
+          ${ballStrikeDots(state.balls, state.strikes)}
+        </div>
+      </div>
+      <div class="diamond-wrap">${basesDiamond(state.bases)}</div>
+    </div>` : `<div class="state-row"><div class="game-status">Final</div></div>`;
+
+  el.innerHTML = `
+    <div class="team-row${awayFlash ? ' flash' : ''}">
+      <span class="team-name">${state.away_team || 'Away'}</span>
+      <span class="team-score${awayLead ? ' leading' : ''}">${state.away_score}</span>
+    </div>
+    <div class="team-row${homeFlash ? ' flash' : ''}">
+      <span class="team-name">${state.home_team || 'Home'}</span>
+      <span class="team-score${homeLead ? ' leading' : ''}">${state.home_score}</span>
+    </div>
+    ${stateRow}
+    ${lineScoreRows}
+    ${leaderBannerHtml(state)}
+  `;
+}
+
+function donutChart(segments, size) {
+  // segments: [{value, color}] -- returns an SVG donut built from
+  // stroke-dasharray arcs, no external chart library needed.
+  const total = segments.reduce((s, x) => s + (x.value || 0), 0);
+  const r = size / 2 - 9;
+  const cx = size / 2, cy = size / 2;
+  const circumference = 2 * Math.PI * r;
+  if (!total) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="13" /></svg>`;
+  }
+  let offset = 0;
+  let circles = '';
+  segments.forEach(seg => {
+    if (!seg.value) return;
+    const frac = seg.value / total;
+    const dash = frac * circumference;
+    circles += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${seg.color}" stroke-width="13"
+      stroke-dasharray="${dash} ${circumference - dash}" stroke-dashoffset="${-offset}"
+      transform="rotate(-90 ${cx} ${cy})" />`;
+    offset += dash;
+  });
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${circles}</svg>`;
+}
+
+// Same donut, but with a big percentage number overlaid in the center
+// via absolute positioning -- used for single-percentage "gauge" style
+// stats (Quality PA%) rather than a multi-segment breakdown with a
+// separate legend.
+function gaugeChart(pct, size, color) {
+  const svg = donutChart([{ value: pct, color }, { value: 1 - pct, color: 'rgba(255,255,255,0.10)' }], size);
+  const pctText = Math.round(pct * 100);
+  return `
+    <div style="position:relative; width:${size}px; height:${size}px;">
+      ${svg}
+      <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+                  font-size:${Math.round(size * 0.24)}px; font-weight:800; font-variant-numeric:tabular-nums;">
+        ${pctText}%
+      </div>
+    </div>`;
+}
+
+function legendRow(color, label, value) {
+  if (!value) return '';
+  return `<div class="li"><span class="dot" style="background:${color}"></span>${label} ${value}</div>`;
+}
+
+// Generic split-table builder: rows = [[label, totals], ...], cols =
+// [[header, key, isHero], ...]. `totals` is one of splits.py's own
+// finalized dicts (avg/obp/slg/ops etc, or avg_against for pitchers) --
+// rendered straight through, so it stays correct/updating as long as
+// the backend keeps recomputing it from the full game log.
+function splitTable(title, rows, cols) {
+  const body = rows
+    .filter(([, t]) => t)
+    .map(([label, t]) => `<tr><td>${label}</td>${cols.map(([, key, hero]) =>
+      `<td${hero ? ' class="hero"' : ''}>${fmt3(t[key])}</td>`).join('')}</tr>`)
+    .join('');
+  if (!body) return '';
+  return `
+    <div class="mini-label">${title}</div>
+    <table class="mini-table">
+      <thead><tr><th></th>${cols.map(([h]) => `<th>${h}</th>`).join('')}</tr></thead>
+      <tbody>${body}</tbody>
+    </table>`;
+}
+
+// Horizontal bar chart for the same split rows splitTable renders as
+// text -- same data (platoon + situational, already flowing through
+// the batter/pitcher card with zero extra backend calls), just a
+// visual instead of a table. Bar length is relative to `scaleMax`
+// (a fixed ceiling, not the max value actually present) so bars stay
+// comparable across different players/polls rather than each chart
+// silently rescaling itself.
+function splitBarChart(title, rows, key, color, scaleMax) {
+  const items = rows.filter(([, t]) => t && t[key] !== null && t[key] !== undefined);
+  if (!items.length) return '';
+  const bars = items.map(([label, t]) => {
+    const v = t[key];
+    const pct = Math.max(0, Math.min(100, (v / scaleMax) * 100));
+    return `
+      <div class="barchart-row">
+        <div class="barchart-label">${label}</div>
+        <div class="barchart-track"><div class="barchart-fill" style="width:${pct}%; background:${color};"></div></div>
+        <div class="barchart-value">${fmt3(v)}</div>
+      </div>`;
+  }).join('');
+  return `<div class="barchart-block"><div class="chart-title">${title}</div>${bars}</div>`;
+}
+
+function renderBatterCard(state) {
+  const el = document.getElementById('battercard');
+  const b = state.batter;
+  if (!state.found || state.is_game_over) {
+    el.innerHTML = `<div class="batter-info"><div class="now-batting-label">&nbsp;</div><div class="batter-meta">${state.is_game_over ? 'Game Final' : 'Waiting for live game data\u2026'}</div></div>`;
+    return;
+  }
+  if (!b) {
+    el.innerHTML = `<div class="batter-info"><div class="now-batting-label">Now Batting</div><div class="batter-meta">Stat card unavailable for this player</div></div>`;
+    return;
+  }
+
+  const headshot = b.headshotUrl
+    ? `<img class="headshot" src="${b.headshotUrl}" alt="">`
+    : `<div class="headshot placeholder">No Photo</div>`;
+
+  let recentChart = '';
+  const rp = b.recent_pa;
+  if (rp && rp.total) {
+    const c = rp.counts;
+    const hits = (c.single || 0) + (c.double || 0) + (c.triple || 0);
+    const segs = [
+      { value: hits, color: '#E8B84B' },
+      { value: c.hr, color: '#C24A3A' },
+      { value: c.bb_hbp, color: '#4A9B8E' },
+      { value: c.so, color: '#5C4A45' },
+      { value: c.other_out, color: '#8B6F5C' },
+    ];
+    recentChart = `
+      <div class="chart-block">
+        ${donutChart(segs, 108)}
+        <div>
+          <div class="chart-title">Last ${rp.total} PA</div>
+          <div class="legend">
+            ${legendRow('#E8B84B', 'Hits', hits)}
+            ${legendRow('#C24A3A', 'HR', c.hr)}
+            ${legendRow('#4A9B8E', 'BB/HBP', c.bb_hbp)}
+            ${legendRow('#5C4A45', 'SO', c.so)}
+            ${legendRow('#8B6F5C', 'Out', c.other_out)}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  let qualityChart = '';
+  const cq = b.contact_quality;
+  if (cq && cq.total) {
+    const segs = [
+      { value: cq.hard, color: '#C24A3A' },
+      { value: cq.medium, color: '#E8B84B' },
+      { value: cq.soft, color: '#5C4A45' },
+    ];
+    qualityChart = `
+      <div class="chart-block">
+        ${donutChart(segs, 108)}
+        <div>
+          <div class="chart-title">Contact Quality</div>
+          <div class="legend">
+            ${legendRow('#C24A3A', 'Hard', cq.hard)}
+            ${legendRow('#E8B84B', 'Med', cq.medium)}
+            ${legendRow('#5C4A45', 'Soft', cq.soft)}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // Quality PA% -- not a hits/AVG stat at all: counts a plate appearance
+  // as "quality" if it's a hit, walk, HBP, hard-hit ball even when it's
+  // an out, a sac fly/bunt or any PA that scored a run, a 6+ pitch
+  // battle, or fighting back from an 0-2 count. A .200 hitter can still
+  // be running a quality at-bat every time up -- this is the number
+  // that shows it. Computed by the exact same full-season at-bat walk
+  // build_batter_situational_splits already runs for the RISP/2-strikes
+  // rows above, so surfacing it here costs nothing extra -- it was
+  // being thrown away before, not skipped for performance reasons.
+  let qpaChart = '';
+  const qpa = (b.situational || {}).quality_pa;
+  if (qpa && qpa.total_pa) {
+    qpaChart = `
+      <div class="chart-block">
+        ${gaugeChart(qpa.pct || 0, 108, '#E8B84B')}
+        <div>
+          <div class="chart-title">Quality PA%</div>
+          <div class="qpa-label">${qpa.quality_pa_count}/${qpa.total_pa} PA this season</div>
+        </div>
+      </div>`;
+  }
+
+  // AVG splits: platoon (vs LHP/RHP, straight from CBL's own precomputed
+  // feed) plus a few "fun" situational rows walked from the full game
+  // log (RISP, bases empty, 2 strikes, late & close) -- see
+  // broadcast_overlay.py's build_batter_situational_splits.
+  const platoon = b.platoon || {};
+  const sit = b.situational || {};
+  const splitRows = [
+    ['vs LHP', platoon.vsLeft], ['vs RHP', platoon.vsRight],
+    ['RISP', sit.risp], ['Bases Empty', sit.bases_empty],
+    ['2 Strikes', sit.two_strikes], ['Late & Close', sit.late_close],
+  ];
+  const splitsHtml = splitTable('AVG Splits', splitRows, [['AVG', 'avg', true], ['OPS', 'ops']]);
+  const splitsChart = splitBarChart('AVG Splits', splitRows, 'avg', '#E8B84B', 0.500);
+
+  // Today's game line -- CBL's own pre-aggregated per-game batting
+  // numbers for this player (broadcast_overlay.py's build_batter_card
+  // -> gameday.get_player_batting_stats), NOT the season row above --
+  // this is what updates play-by-play as today's game goes on, same
+  // idea as the pitcher panel's own todayRow.
+  //
+  // The headline AVG/OBP/SLG/OPS/HR/RBI above are already a LIVE BLEND
+  // of season + today (see broadcast_overlay.py's
+  // _blended_batting_line) -- b.includes_today tells us whether
+  // there's actually anything blended in yet. When there is, the
+  // asterisk on the stat labels plus this line's "Entering today: ..."
+  // clause makes clear those headline numbers aren't CBL's own official
+  // season figures anymore, without needing a second stat row.
+  const bt = b.today;
+  let todayRow = '';
+  if (bt && (bt.ab || bt.h || bt.bb || bt.so)) {
+    const extra = [];
+    if (bt.doubles) extra.push(`${bt.doubles} 2B`);
+    if (bt.triples) extra.push(`${bt.triples} 3B`);
+    if (bt.hr) extra.push(`${bt.hr} HR`);
+    if (bt.rbi) extra.push(`${bt.rbi} RBI`);
+    if (bt.bb) extra.push(`${bt.bb} BB`);
+    if (bt.so) extra.push(`${bt.so} SO`);
+    const seasonNote = b.includes_today
+      ? ` &middot; Entering today: <b>${fmt3(b.season_avg)}</b>/<b>${fmt3(b.season_ops)}</b> OPS`
+      : '';
+    todayRow = `
+      <div class="today-row">
+        <span>Today: <b>${bt.h ?? 0}-${bt.ab ?? 0}</b>${extra.length ? `, ${extra.join(', ')}` : ''}${seasonNote}</span>
+      </div>`;
+  }
+
+  const statAsterisk = b.includes_today ? '*' : '';
+
+  el.innerHTML = `
+    ${headshot}
+    <div class="batter-info">
+      <div class="now-batting-label">Now Batting</div>
+      <div class="batter-name">${b.name || ''}</div>
+      <div class="batter-meta">${b.team || ''} &middot; ${b.position || ''}</div>
+      <div class="stat-row">
+        <div class="stat"><div class="v">${fmt3(b.avg)}</div><div class="k">AVG${statAsterisk}</div></div>
+        <div class="stat"><div class="v">${fmt3(b.obp)}</div><div class="k">OBP${statAsterisk}</div></div>
+        <div class="stat"><div class="v">${fmt3(b.slg)}</div><div class="k">SLG${statAsterisk}</div></div>
+        <div class="stat"><div class="v">${fmt3(b.ops)}</div><div class="k">OPS${statAsterisk}</div></div>
+        <div class="stat"><div class="v">${b.hr ?? 0}</div><div class="k">HR${statAsterisk}</div></div>
+        <div class="stat"><div class="v">${b.rbi ?? 0}</div><div class="k">RBI${statAsterisk}</div></div>
+      </div>
+      ${todayRow}
+      ${splitsHtml}
+    </div>
+    <div class="charts">${recentChart}${qualityChart}${qpaChart}${splitsChart}</div>
+  `;
+}
+
+function pitchTypeInfo(result) {
+  const BALL = new Set(['ball']);
+  const STRIKE = new Set(['called_strike', 'swinging_strike']);
+  const FOUL = new Set(['foul', 'foul_bunt']);
+  if (BALL.has(result)) return { cls: 'ball', label: 'B' };
+  if (STRIKE.has(result)) return { cls: 'strike', label: result === 'swinging_strike' ? 'SS' : 'CS' };
+  if (FOUL.has(result)) return { cls: 'foul', label: 'F' };
+  return { cls: 'other', label: 'X' }; // ball put in play, or an unrecognized result -- shown neutrally rather than guessed
+}
+
+function pitchSequenceHtml(seq) {
+  if (!seq || !seq.length) return '';
+  const chips = seq.map(p => {
+    const info = pitchTypeInfo(p.result);
+    return `<div class="pitch-chip ${info.cls}" title="${p.balls}-${p.strikes} count">${info.label}</div>`;
+  }).join('');
+  return `<div class="mini-label">This At-Bat</div><div class="pitchseq-row">${chips}</div>`;
+}
+
+function renderPitchingPanel(state) {
+  const el = document.getElementById('pitchingpanel');
+  const p = state.pitcher;
+  if (!state.found || state.is_game_over || !p) {
+    el.innerHTML = `<div class="label">Now Pitching</div><div class="meta">${state.is_game_over ? 'Game Final' : 'No live pitcher data'}</div>`;
+    return;
+  }
+  const headshot = p.headshotUrl
+    ? `<img class="headshot-sm" src="${p.headshotUrl}" alt="">`
+    : `<div class="headshot-sm" style="display:flex;align-items:center;justify-content:center;font-size:9px;color:#7C645B;">No Photo</div>`;
+
+  const today = p.today;
+  const todayRow = today
+    ? `<div class="today-row">
+         <span>Today: <b>${today.pitchCount ?? '--'}</b> pitches (<b>${today.strikes ?? '--'}</b>K / <b>${today.balls ?? '--'}</b>B)</span>
+       </div>`
+    : '';
+
+  // Pitcher splits: platoon (vs LHB/RHB, from CBL's own precomputed
+  // feed) plus RISP / bases-empty from the season-long walk -- see
+  // broadcast_overlay.py's build_pitcher_situational_splits. Pitcher
+  // rows use avg_against, not avg, hence the separate cols/key here.
+  const platoon = p.platoon || {};
+  const sit = p.situational || {};
+  const splitRows = [
+    ['vs LHB', platoon.vsLeft], ['vs RHB', platoon.vsRight],
+    ['RISP', sit.risp], ['Bases Empty', sit.bases_empty],
+  ];
+  const splitsHtml = splitTable('Pitcher Splits', splitRows, [['AVG', 'avg_against', true]]);
+  const splitsChart = splitBarChart('AVG Against Splits', splitRows, 'avg_against', '#4A9B8E', 0.500);
+
+  el.innerHTML = `
+    <div class="label">Now Pitching</div>
+    <div class="pitcher-row">
+      ${headshot}
+      <div>
+        <div class="name">${p.name || ''}${p.throws ? ` (${p.throws})` : ''}</div>
+        <div class="meta">${p.wins ?? 0}-${p.losses ?? 0}${p.saves ? `, ${p.saves} SV` : ''} &middot; ${p.innings_pitched ?? '--'} IP</div>
+      </div>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><div class="v">${fmt2(p.era)}</div><div class="k">ERA</div></div>
+      <div class="stat"><div class="v">${fmt2(p.whip)}</div><div class="k">WHIP</div></div>
+      <div class="stat"><div class="v">${p.strikeouts ?? 0}</div><div class="k">SO</div></div>
+      <div class="stat"><div class="v">${p.walks ?? 0}</div><div class="k">BB</div></div>
+    </div>
+    ${todayRow}
+    ${pitchSequenceHtml(state.pitch_sequence)}
+    ${splitsHtml}
+    ${splitsChart}
+  `;
+}
+
+async function poll() {
+  if (!GAME_ID) {
+    document.getElementById('statusmsg').textContent = 'No game selected -- add ?game=<public_game_id> to the URL.';
+    return;
+  }
+  try {
+    const resp = await fetch(`/broadcast/state.json?game=${encodeURIComponent(GAME_ID)}`);
+    const state = await resp.json();
+    stateBuffer.push({ t: Date.now(), state });
+    // Keep enough history to cover the current delay setting, plus a
+    // safety margin for slow polls -- trim anything older than that so
+    // the buffer doesn't grow without bound over a multi-hour broadcast.
+    const cutoff = Date.now() - (delaySeconds * 1000) - 30000;
+    stateBuffer = stateBuffer.filter(e => e.t >= cutoff);
+    document.getElementById('statusmsg').textContent = '';
+  } catch (e) {
+    document.getElementById('statusmsg').textContent = 'Connection error -- retrying\u2026';
+  }
+}
+
+function renderDelayed() {
+  if (!stateBuffer.length) return;
+  // Find the most recent buffered state that's old enough to match the
+  // configured delay -- i.e. what was actually true `delaySeconds` ago,
+  // which is roughly what a delayed stream is showing viewers right now.
+  const targetTime = Date.now() - (delaySeconds * 1000);
+  let chosen = stateBuffer[0];
+  for (const entry of stateBuffer) {
+    if (entry.t <= targetTime) chosen = entry;
+    else break;
+  }
+  renderScoreboard(chosen.state);
+  renderPitchingPanel(chosen.state);
+  renderBatterCard(chosen.state);
+}
+
+// ---- delay control: hidden by default (this composites directly into
+// the broadcast frame, so nothing shows on-screen unless explicitly
+// toggled) -- press "D" to show/hide a small input, no page reload
+// needed to change it. ?delay=N in the URL sets the starting value,
+// useful for saving a per-stream OBS browser-source preset.
+const params = new URLSearchParams(location.search);
+let delaySeconds = parseInt(params.get('delay') || '0', 10) || 0;
+let stateBuffer = [];
+
+const delayBox = document.createElement('div');
+delayBox.id = 'delaybox';
+delayBox.style.cssText = 'position:fixed; top:10px; left:10px; z-index:999; display:none; ' +
+  'background:rgba(16,11,10,0.94); border:1px solid #C24A3A; border-radius:4px; padding:8px 10px; ' +
+  'font-size:12px; color:#F4E7E2; font-family:inherit;';
+delayBox.innerHTML = `
+  Delay (sec): <input id="delayinput" type="number" min="0" step="1" value="${delaySeconds}"
+    style="width:60px; margin-left:4px; background:rgba(255,255,255,0.08); border:1px solid #C24A3A; color:#fff; padding:2px 4px;">
+  <span style="color:#7C645B; margin-left:6px;">(press D to hide)</span>
+`;
+document.body.appendChild(delayBox);
+document.getElementById('delayinput').addEventListener('input', function (e) {
+  const v = parseInt(e.target.value, 10);
+  delaySeconds = isNaN(v) || v < 0 ? 0 : v;
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'd' || e.key === 'D') {
+    delayBox.style.display = delayBox.style.display === 'none' ? 'block' : 'none';
+  }
+});
+
+poll();
+renderDelayed();
+setInterval(poll, 2000);        // poll frequently so the buffer has fine-grained coverage
+setInterval(renderDelayed, 1000); // render on its own tick so display updates smoothly as buffered data ages past the delay
+</script>
+
+</body>
+</html>

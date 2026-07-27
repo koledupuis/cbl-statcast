@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}{{ team_name }} Splits &middot; CBL Stats{% endblock %}
+
+{% block content %}
+<div class="player-header">
+  <div>
+    <div class="player-name">{{ team_name }}</div>
+    <div class="player-meta">Team Splits &middot; <a href="{{ url_for('team_roster', team_name=team_name) }}" style="color:inherit; text-decoration:underline;">Back to Roster</a></div>
+  </div>
+</div>
+
+{% if team_situational %}
+<div class="section-title" style="margin-top:26px;">Team Situational Hitting</div>
+<div class="section-sub">Whole-team batting output by base-state situation this season &middot; single pass over the schedule, not a per-player sum</div>
+<div class="splits-table-wrap">
+<table class="stat-table">
+  <thead><tr>
+    <th>Situation</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+    <th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
+  </tr></thead>
+  <tbody>
+    {% for label, t in team_situational %}
+    <tr{% if label == "Scoring Position" %} style="border-top:2px solid var(--paper-line);"{% endif %}>
+      <td><b>{{ label }}</b></td>
+      <td>{{ t.pa }}</td><td>{{ t.ab }}</td><td>{{ t.r }}</td><td>{{ t.h }}</td><td>{{ t.hr }}</td>
+      <td>{{ t.avg|fmt3 }}</td><td>{{ t.obp|fmt3 }}</td><td>{{ t.slg|fmt3 }}</td><td>{{ t.ops|fmt3 }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<div class="note">
+  "R" is the real number of runs scored on each play (a grand slam counts as 4, not 1) &mdash; built as one
+  pass over the team's own schedule crediting every at-bat where the team was actually batting, not a sum
+  of each individual player's own situational splits.
+</div>
+{% endif %}
+
+<div class="section-title" style="margin-top:26px;">Batting &mdash; Platoon Splits</div>
+<div class="section-sub">Every batter's season line plus vs-LHP / vs-RHP &middot; click a name for deeper splits (RISP, Bases Loaded, etc.)</div>
+{% if not batters %}
+<div class="empty-state">No batters on this roster yet.</div>
+{% else %}
+<div class="splits-table-wrap">
+<table class="stat-table">
+  <thead><tr>
+    <th>Player</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th><th>{{ 'RC'|abbr }}</th>
+    <th>vs LHP PA</th><th>vs LHP AVG</th><th>vs LHP OPS</th>
+    <th>vs RHP PA</th><th>vs RHP AVG</th><th>vs RHP OPS</th>
+  </tr></thead>
+  <tbody>
+    {% for b in batters %}
+    <tr>
+      <td><a class="player-link" href="{{ url_for('player_page', player_id=b.playerId) }}">{{ b.fullName }}</a></td>
+      <td>{{ b.plateAppearances }}</td>
+      <td>{{ b.battingAvg|fmt3 }}</td><td>{{ b.obp|fmt3 }}</td><td>{{ b.slg|fmt3 }}</td><td>{{ b.ops|fmt3 }}</td>
+      <td>{{ b.rc|fmt1 if b.rc is not none else "---" }}</td>
+      {% if b.vsLeft %}
+      <td>{{ b.vsLeft.plateAppearances }}</td><td>{{ b.vsLeft.battingAverage|fmt3 }}</td><td>{{ b.vsLeft.onBasePlusSlugging|fmt3 }}</td>
+      {% else %}
+      <td colspan="3" class="team-tag">no data</td>
+      {% endif %}
+      {% if b.vsRight %}
+      <td>{{ b.vsRight.plateAppearances }}</td><td>{{ b.vsRight.battingAverage|fmt3 }}</td><td>{{ b.vsRight.onBasePlusSlugging|fmt3 }}</td>
+      {% else %}
+      <td colspan="3" class="team-tag">no data</td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+<div class="section-title" style="margin-top:32px;">Pitching &mdash; Platoon Splits</div>
+<div class="section-sub">Every pitcher's season line plus vs-LHH / vs-RHH &middot; click a name for deeper splits (vs Opponent, situational, etc.)</div>
+{% if not pitchers %}
+<div class="empty-state">No pitchers on this roster yet.</div>
+{% else %}
+<div class="splits-table-wrap">
+<table class="stat-table">
+  <thead><tr>
+    <th>Player</th><th>{{ 'IP'|abbr }}</th><th>{{ 'ERA'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th>
+    <th>vs LHH BF</th><th>vs LHH AVG</th>
+    <th>vs RHH BF</th><th>vs RHH AVG</th>
+  </tr></thead>
+  <tbody>
+    {% for p in pitchers %}
+    <tr>
+      <td><a class="player-link" href="{{ url_for('player_page', player_id=p.playerId) }}">{{ p.fullName }}</a></td>
+      <td>{{ p.inningsPitched }}</td><td>{{ p.era|fmt2 }}</td><td>{{ p.whip|fmt2 }}</td>
+      {% if p.vsLeft %}
+      <td>{{ p.vsLeft.plateAppearances or p.vsLeft.battersFaced or p.vsLeft.batters_faced or p.vsLeft.bf or 0 }}</td><td>{{ p.vsLeft.battingAverage|fmt3 }}</td>
+      {% else %}
+      <td colspan="2" class="team-tag">no data</td>
+      {% endif %}
+      {% if p.vsRight %}
+      <td>{{ p.vsRight.plateAppearances or p.vsRight.battersFaced or p.vsRight.batters_faced or p.vsRight.bf or 0 }}</td><td>{{ p.vsRight.battingAverage|fmt3 }}</td>
+      {% else %}
+      <td colspan="2" class="team-tag">no data</td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+<div class="note">
+  Platoon splits come straight from CBL's own per-player analytics feed &mdash; "no data" means CBL
+  hasn't recorded any plate appearances against that side of pitching/hitting for this player yet, not
+  necessarily zero. Situational splits (RISP, Bases Loaded, vs a specific opponent, etc.) aren't shown
+  here since they'd need a full schedule walk per player &mdash; too slow for a whole-roster page. Click
+  any player's name for their full breakdown.
+</div>
+{% endblock %}

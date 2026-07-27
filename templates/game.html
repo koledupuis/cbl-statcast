@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}{{ gd.away_team }} at {{ gd.home_team }} &middot; CBL Stats{% endblock %}
+
+{% macro pitch_dot(p) %}
+{% set cls = {
+  'ball': 'ball', 'called_strike': 'strike', 'swinging_strike': 'strike',
+  'foul': 'foul'
+} %}
+<span class="pitch-dot {{ cls.get(p.result, 'other') }}" title="{{ p.result|replace('_',' ') }} ({{ p.count }})"></span>
+{% endmacro %}
+
+{% block content %}
+<div class="game-header">
+  <div class="game-header-teams">
+    <span class="game-team">{{ gd.away_team }}</span>
+    <span class="game-vs">at</span>
+    <span class="game-team">{{ gd.home_team }}</span>
+  </div>
+  <div class="game-header-meta">
+    {{ gd.game_date }}{% if setup.gameTime %} &middot; {{ setup.gameTime }}{% endif %}
+    {% if setup.venue %} &middot; {{ setup.venue }}{% endif %}
+    &middot; <span class="game-status-tag">{{ gd.status|replace('_',' ')|capitalize }}</span>
+  </div>
+</div>
+
+<div class="section-title">Line Score</div>
+<div class="linescore-wrap">
+<table class="stat-table linescore">
+  <thead>
+    <tr>
+      <th class="team-col">&nbsp;</th>
+      {% for i in line_score.innings %}<th>{{ i }}</th>{% endfor %}
+      <th>{{ 'R'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'E'|abbr }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="team-col">{{ gd.away_team }}</td>
+      {% for r in line_score.away.line %}<td>{{ r }}</td>{% endfor %}
+      <td class="total-col">{{ line_score.away.runs }}</td>
+      <td class="total-col">{{ line_score.away.hits }}</td>
+      <td class="total-col">{{ line_score.away.errors }}</td>
+    </tr>
+    <tr>
+      <td class="team-col">{{ gd.home_team }}</td>
+      {% for r in line_score.home.line %}<td>{{ r }}</td>{% endfor %}
+      <td class="total-col">{{ line_score.home.runs }}</td>
+      <td class="total-col">{{ line_score.home.hits }}</td>
+      <td class="total-col">{{ line_score.home.errors }}</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="section-title">Box Score &mdash; Batting</div>
+{% for side, label in [("away", gd.away_team), ("home", gd.home_team)] %}
+<div class="section-sub">{{ label }}</div>
+<table class="stat-table" style="margin-bottom:22px;">
+  <thead><tr>
+    <th>Player</th><th>Pos</th><th>{{ 'AB'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ '2B'|abbr }}</th><th>{{ '3B'|abbr }}</th><th>{{ 'HR'|abbr }}</th><th>{{ 'RBI'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th>
+  </tr></thead>
+  <tbody>
+    {% for r in batting_box[side] %}
+    <tr>
+      <td>{{ r.name }}</td>
+      <td class="team-tag">{{ r.position }}</td>
+      <td>{{ r.ab }}</td><td>{{ r.r }}</td><td>{{ r.h }}</td>
+      <td>{{ r.doubles }}</td><td>{{ r.triples }}</td><td>{{ r.hr }}</td>
+      <td>{{ r.rbi }}</td><td>{{ r.bb }}</td><td>{{ r.so }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="11" class="empty-state">No plate appearances recorded.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+
+<div class="section-title">Box Score &mdash; Pitching</div>
+{% for side, label in [("away", gd.away_team), ("home", gd.home_team)] %}
+<div class="section-sub">{{ label }}</div>
+<table class="stat-table" style="margin-bottom:22px;">
+  <thead><tr>
+    <th>Pitcher</th><th>{{ 'IP'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'HR'|abbr }}</th><th>Pitches</th>
+  </tr></thead>
+  <tbody>
+    {% for r in pitching_box[side] %}
+    <tr>
+      <td>{{ r.name }}</td>
+      <td>{{ r.ip }}</td><td>{{ r.h }}</td><td>{{ r.r }}</td>
+      <td>{{ r.bb }}</td><td>{{ r.so }}</td><td>{{ r.hr }}</td><td>{{ r.pitches }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8" class="empty-state">No pitching recorded.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+
+<div class="section-title">Play-by-Play</div>
+{% for inning, halves in play_by_play.items() %}
+  {% for half, label in [("top", "Top " ~ inning ~ " &middot; " ~ gd.away_team), ("bottom", "Bottom " ~ inning ~ " &middot; " ~ gd.home_team)] %}
+    {% if halves[half] %}
+    <details class="pbp-inning">
+      <summary>{{ label|safe }}</summary>
+      {% for pa in halves[half] %}
+      <div class="pbp-row {{ 'pbp-error' if pa.is_error }}">
+        <div class="pbp-main">
+          <span class="pbp-batter">{{ pa.batter }}</span>
+          <span class="pbp-outcome">{{ pa.outcome_label }}</span>
+          {% if pa.pitcher %}<span class="pbp-vs">vs {{ pa.pitcher }}</span>{% endif %}
+          {% if pa.rbi %}<span class="pbp-rbi">{{ pa.rbi }} RBI</span>{% endif %}
+          {% if pa.runs_scored %}<span class="pbp-scored">Scored: {{ pa.runs_scored|join(', ') }}</span>{% endif %}
+        </div>
+        {% if pa.batted_ball %}
+        <div class="pbp-battedball">
+          {{ pa.batted_ball.type|replace('_',' ')|capitalize }}
+          &middot; {{ pa.batted_ball.quality|capitalize }} contact
+          &middot; {{ pa.batted_ball.direction|capitalize }} field
+        </div>
+        {% endif %}
+        {% if pa.pitches %}
+        <div class="pbp-pitches">
+          {% for p in pa.pitches %}{{ pitch_dot(p) }}{% endfor %}
+          <span class="pbp-pitch-count">{{ pa.pitch_count }} pitch{{ 'es' if pa.pitch_count != 1 else '' }}</span>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </details>
+    {% endif %}
+  {% endfor %}
+{% endfor %}
+
+<div class="note">
+  Line score, box scores, and play-by-play are all derived on the fly from CBL's public pitch-by-pitch
+  gameday feed &mdash; runs/hits/errors, batting and pitching lines, and pitch sequences are computed
+  from the raw at-bat log, not pulled from a separate boxscore endpoint.
+</div>
+{% endblock %}

@@ -1,0 +1,991 @@
+{% extends "base.html" %}
+{% block title %}{{ player.fullName }} &middot; CBL Stats{% endblock %}
+
+{% macro pct_bar(label, value_display, pct) %}
+{% set base_label = label.split(' (')[0] %}
+{% set suffix = label[base_label|length:] %}
+<div class="pct-row">
+  <div class="pct-label">{{ base_label|abbr }}{{ suffix }}</div>
+  <div class="pct-value">{{ value_display }}</div>
+  <div class="pct-track">
+    <div class="pct-marker" style="left: {{ pct }}%;" data-pct="{{ pct }}"></div>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro split_table(title, rows) %}
+{% if rows %}
+<div class="section-title" style="margin-top:26px;">{{ title }}</div>
+<div class="splits-table-wrap">
+<table class="stat-table">
+  <thead><tr>
+    <th>Split</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ '2B'|abbr }}</th><th>{{ '3B'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+    <th>{{ 'RBI'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'HBP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
+  </tr></thead>
+  <tbody>
+    {% for label, t in rows %}
+    <tr>
+      <td>{{ label }}</td>
+      <td>{{ t.pa }}</td><td>{{ t.ab }}</td><td>{{ t.r }}</td><td>{{ t.h }}</td>
+      <td>{{ t.doubles }}</td><td>{{ t.triples }}</td><td>{{ t.hr }}</td>
+      <td>{{ t.rbi }}</td><td>{{ t.bb }}</td><td>{{ t.so }}</td><td>{{ t.hbp }}</td>
+      <td>{{ t.avg|fmt3 }}</td><td>{{ t.obp|fmt3 }}</td><td>{{ t.slg|fmt3 }}</td><td>{{ t.ops|fmt3 }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro pitch_split_table(title, rows) %}
+{% if rows %}
+<div class="section-title" style="margin-top:26px;">{{ title }}</div>
+<div class="splits-table-wrap">
+<table class="stat-table">
+  <thead><tr>
+    <th>Split</th><th>{{ 'BF'|abbr }}</th><th>{{ 'IP'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+    <th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'ERA*'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th>
+  </tr></thead>
+  <tbody>
+    {% for label, t in rows %}
+    <tr>
+      <td>{{ label }}</td>
+      <td>{{ t.bf }}</td><td>{{ t.ip }}</td><td>{{ t.h }}</td><td>{{ t.r }}</td><td>{{ t.hr }}</td>
+      <td>{{ t.bb }}</td><td>{{ t.so }}</td>
+      <td>{{ t.era|fmt2 }}</td><td>{{ t.whip|fmt2 if t.whip is not none else "---" }}</td>
+      <td>{{ t.avg_against|fmt3 }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro kv(label, value) %}
+<div class="kv-row"><span class="k">{{ label|abbr|safe }}</span><span class="v">{{ value }}</span></div>
+{% endmacro %}
+
+{% macro bb_bar(label, count, total, cls) %}
+<div class="bb-bar-row">
+  <div class="bb-bar-label"><span>{{ label }}</span><span>{{ count }} ({{ "%.0f"|format((count / total * 100) if total else 0) }}%)</span></div>
+  <div class="bb-bar-track">
+    <div class="bb-bar-fill {{ cls }}" style="width: {{ (count / total * 100) if total else 0 }}%;"></div>
+  </div>
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="player-header">
+  {% if player.headshotUrl %}
+    <img class="player-photo" src="{{ player.headshotUrl }}" alt="{{ player.fullName }}">
+  {% endif %}
+  <div>
+    <div class="player-name">{{ player.fullName }}</div>
+    <div class="player-meta">
+      <b>{% for tn in player_team_names %}<a href="{{ url_for('team_roster', team_name=tn) }}" style="color:inherit; text-decoration:underline; text-decoration-color:rgba(237,230,211,0.4);">{{ tn }}</a>{{ ' / ' if not loop.last }}{% endfor %}</b> &middot; {{ player.position }}
+      {% if analytics and analytics.player %}
+        &middot; Bats {{ analytics.player.bats or '?' }} / Throws {{ analytics.player.throws or '?' }}
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if b_row or p_row %}
+<div class="tabs" style="margin-top:18px;">
+  <a href="#" class="player-tab-link active" data-tab="overview" onclick="return showPlayerTab('overview', this);">Overview</a>
+  {% if b_row or pitcher_game_log %}
+  <a href="#" class="player-tab-link" data-tab="gamelog" onclick="return showPlayerTab('gamelog', this);">Game Log</a>
+  {% endif %}
+  {% if season_splits or pitcher_season_splits %}
+  <a href="#" class="player-tab-link" data-tab="splits" onclick="return showPlayerTab('splits', this);">Splits</a>
+  {% endif %}
+  {% if batting_adv or pitching_adv %}
+  <a href="#" class="player-tab-link" data-tab="advanced" onclick="return showPlayerTab('advanced', this);">Advanced</a>
+  {% endif %}
+  {% if fielding_position_splits %}
+  <a href="#" class="player-tab-link" data-tab="fielding" onclick="return showPlayerTab('fielding', this);">Fielding</a>
+  {% endif %}
+</div>
+{% endif %}
+
+<div id="tab-overview">
+
+{% if player_team_names|length > 1 %}
+<div class="note" style="border: 1px solid var(--brick); padding: 10px 14px; margin: 0 0 20px; font-style: normal;">
+  This player appears on more than one team's season stats this year ({{ player_team_names|join(' and ') }}).
+  Every number on this page &mdash; season stats, game log, splits &mdash; is combined across all of them,
+  not just whichever team happened to come first in CBL's data. See <span class="mono">player_merge.py</span>.
+</div>
+{% endif %}
+
+{% if b_row %}
+<div class="stat-line">
+  <div class="stat"><div class="v">{{ b_row.battingAvg|fmt3 }}</div><div class="k">{{ 'AVG'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ b_row.obp|fmt3 }}</div><div class="k">{{ 'OBP'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ b_row.slg|fmt3 }}</div><div class="k">{{ 'SLG'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ b_row.ops|fmt3 }}</div><div class="k">{{ 'OPS'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ b_row.homeRuns }}</div><div class="k">{{ 'HR'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ b_row.rbi }}</div><div class="k">{{ 'RBI'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ b_row.games }}</div><div class="k">{{ 'G'|abbr }}</div></div>
+</div>
+{% if momentum %}
+<div class="momentum-badge">
+  <span class="momentum-label">{{ momentum.label }}</span>
+  <span class="momentum-score">{{ momentum.score }}/100</span>
+  <span class="momentum-detail">
+    {{ momentum.recent_ops|fmt3 }} OPS over the {{ 'last 7 days' if momentum.used_window == 'last_7_days' else 'last 10 games' }}
+    vs. {{ momentum.season_ops|fmt3 }} season &middot; {{ momentum.hit_streak }}-game hit streak
+  </span>
+</div>
+<div class="note" style="margin-top:6px;">
+  Momentum Meter is a custom broadcast-style score (0&ndash;100), not a standard sabermetric &mdash;
+  it weights recent OPS vs. season OPS, current hit streak, and last-10-game RBI. See
+  <span class="mono">rolling.py</span> for the exact formula and weights.
+</div>
+{% endif %}
+{% endif %}
+
+{% if p_row %}
+<div class="stat-line">
+  <div class="stat"><div class="v">{{ p_row.era|fmt2 }}</div><div class="k">{{ 'ERA'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ p_row.whip|fmt2 }}</div><div class="k">{{ 'WHIP'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ p_row.wins }}-{{ p_row.losses }}</div><div class="k">W-L</div></div>
+  <div class="stat"><div class="v">{{ p_row.strikeoutsPitching }}</div><div class="k">{{ 'SO'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ p_row.inningsPitched }}</div><div class="k">{{ 'IP'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ p_row.saves }}</div><div class="k">{{ 'SV'|abbr }}</div></div>
+</div>
+{% endif %}
+
+{% if f_row %}
+<div class="stat-line">
+  <div class="stat"><div class="v">{{ f_row.fieldingPct|fmt3 }}</div><div class="k">{{ 'FPCT'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ f_row.putouts }}</div><div class="k">{{ 'PO'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ f_row.assists }}</div><div class="k">{{ 'A'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ f_row.errors }}</div><div class="k">{{ 'E'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ f_row.totalChances }}</div><div class="k">{{ 'TC'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ f_row.doublePlays }}</div><div class="k">{{ 'DP'|abbr }}</div></div>
+</div>
+{% endif %}
+
+{% if batting_pct %}
+<div class="section-title">Batting Percentiles</div>
+<div class="section-sub">Rank vs. qualified league hitters (min {{ 10 }} PA) &middot; higher is better</div>
+<div class="pct-grid">
+  {{ pct_bar("AVG", batting_pct.avg[0]|fmt3, batting_pct.avg[1]) }}
+  {{ pct_bar("OBP", batting_pct.obp[0]|fmt3, batting_pct.obp[1]) }}
+  {{ pct_bar("SLG", batting_pct.slg[0]|fmt3, batting_pct.slg[1]) }}
+  {{ pct_bar("OPS", batting_pct.ops[0]|fmt3, batting_pct.ops[1]) }}
+  {{ pct_bar("Walk %", batting_pct.bb_pct[0]|fmt_pct, batting_pct.bb_pct[1]) }}
+  {{ pct_bar("K % (lower better)", batting_pct.k_pct[0]|fmt_pct, batting_pct.k_pct[1]) }}
+  {{ pct_bar("Whiff % (lower better)", batting_pct.whiff_pct[0]|fmt_pct, batting_pct.whiff_pct[1]) }}
+  {{ pct_bar("Ground Ball % (lower better)", batting_pct.gb_pct[0]|fmt_pct, batting_pct.gb_pct[1]) }}
+</div>
+{% endif %}
+
+{% if pitching_pct %}
+<div class="section-title">Pitching Percentiles</div>
+<div class="section-sub">Rank vs. qualified league pitchers (min 3 IP)</div>
+<div class="pct-grid">
+  {{ pct_bar("ERA (lower better)", pitching_pct.era[0]|fmt2, pitching_pct.era[1]) }}
+  {{ pct_bar("WHIP (lower better)", pitching_pct.whip[0]|fmt2, pitching_pct.whip[1]) }}
+  {{ pct_bar("K %", pitching_pct.k_pct[0]|fmt_pct, pitching_pct.k_pct[1]) }}
+  {{ pct_bar("BB % (lower better)", pitching_pct.bb_pct[0]|fmt_pct, pitching_pct.bb_pct[1]) }}
+  {{ pct_bar("Whiff %", pitching_pct.whiff_pct[0]|fmt_pct, pitching_pct.whiff_pct[1]) }}
+  {{ pct_bar("Ground Ball %", pitching_pct.gb_pct[0]|fmt_pct, pitching_pct.gb_pct[1]) }}
+</div>
+{% endif %}
+
+{% if event_batting and event_batting.battedBalls and event_batting.battedBalls.total %}
+{% set bb = event_batting.battedBalls %}
+{% set bb_type_total = (bb.byType.groundBall or 0) + (bb.byType.lineDrive or 0) + (bb.byType.flyBall or 0) + (bb.byType.popup or 0) %}
+{% set bb_quality_total = (bb.byQuality.hard or 0) + (bb.byQuality.medium or 0) + (bb.byQuality.soft or 0) %}
+<div class="section-title">Batted Ball Profile (as hitter)</div>
+<div class="section-sub">{{ bb.total }} balls in play this season</div>
+<div class="pct-grid">
+  <div>
+    <div class="section-sub" style="margin-top:0;">By Type</div>
+    {{ bb_bar("Ground Ball", bb.byType.groundBall, bb.total, "") }}
+    {{ bb_bar("Line Drive", bb.byType.lineDrive, bb.total, "alt") }}
+    {{ bb_bar("Fly Ball", bb.byType.flyBall, bb.total, "gold") }}
+    {{ bb_bar("Popup", bb.byType.popup, bb.total, "") }}
+    {% if bb_type_total < bb.total %}
+    {{ bb_bar("Uncategorized", bb.total - bb_type_total, bb.total, "") }}
+    {% endif %}
+  </div>
+  <div>
+    <div class="section-sub" style="margin-top:0;">By Contact Quality</div>
+    {{ bb_bar("Hard", bb.byQuality.hard, bb.total, "gold") }}
+    {{ bb_bar("Medium", bb.byQuality.medium, bb.total, "alt") }}
+    {{ bb_bar("Soft", bb.byQuality.soft, bb.total, "") }}
+    {% if bb_quality_total < bb.total %}
+    {{ bb_bar("Uncategorized", bb.total - bb_quality_total, bb.total, "") }}
+    {% endif %}
+  </div>
+</div>
+<div class="section-sub" style="margin-top:18px;">By Direction</div>
+<div class="pct-grid">
+  <div>
+    {{ bb_bar("Pull Side (Left)", bb.byDirection.left, bb.total, "") }}
+    {{ bb_bar("Center", bb.byDirection.center, bb.total, "alt") }}
+    {{ bb_bar("Opposite Side (Right)", bb.byDirection.right, bb.total, "gold") }}
+  </div>
+</div>
+{% if bb_type_total < bb.total or bb_quality_total < bb.total %}
+<div class="note">
+  Direction is recorded for every ball in play, but CBL's scorekeeping only tags batted-ball type
+  (ground ball/line drive/fly ball/popup) and contact quality (hard/medium/soft) for
+  {{ bb_type_total }} of {{ bb.total }} balls this season &mdash; the rest show as "Uncategorized"
+  above rather than being silently dropped from the percentages.
+</div>
+{% endif %}
+{% endif %}
+
+{% if event_pitching and event_pitching.battedBalls and event_pitching.battedBalls.total %}
+{% set bbp = event_pitching.battedBalls %}
+{% set bbp_type_total = (bbp.byType.groundBall or 0) + (bbp.byType.lineDrive or 0) + (bbp.byType.flyBall or 0) + (bbp.byType.popup or 0) %}
+{% set bbp_quality_total = (bbp.byQuality.hard or 0) + (bbp.byQuality.medium or 0) + (bbp.byQuality.soft or 0) %}
+<div class="section-title">Batted Ball Profile (as pitcher, contact allowed)</div>
+<div class="section-sub">{{ bbp.total }} balls in play allowed this season</div>
+<div class="pct-grid">
+  <div>
+    <div class="section-sub" style="margin-top:0;">By Type</div>
+    {{ bb_bar("Ground Ball", bbp.byType.groundBall, bbp.total, "") }}
+    {{ bb_bar("Line Drive", bbp.byType.lineDrive, bbp.total, "alt") }}
+    {{ bb_bar("Fly Ball", bbp.byType.flyBall, bbp.total, "gold") }}
+    {{ bb_bar("Popup", bbp.byType.popup, bbp.total, "") }}
+    {% if bbp_type_total < bbp.total %}
+    {{ bb_bar("Uncategorized", bbp.total - bbp_type_total, bbp.total, "") }}
+    {% endif %}
+  </div>
+  <div>
+    <div class="section-sub" style="margin-top:0;">By Contact Quality</div>
+    {{ bb_bar("Hard", bbp.byQuality.hard, bbp.total, "gold") }}
+    {{ bb_bar("Medium", bbp.byQuality.medium, bbp.total, "alt") }}
+    {{ bb_bar("Soft", bbp.byQuality.soft, bbp.total, "") }}
+    {% if bbp_quality_total < bbp.total %}
+    {{ bb_bar("Uncategorized", bbp.total - bbp_quality_total, bbp.total, "") }}
+    {% endif %}
+  </div>
+</div>
+{% if bbp_type_total < bbp.total or bbp_quality_total < bbp.total %}
+<div class="note">
+  CBL's scorekeeping only tags batted-ball type and contact quality for
+  {{ bbp_type_total }} of {{ bbp.total }} balls in play allowed this season &mdash; the rest show
+  as "Uncategorized" rather than being silently dropped from the percentages.
+</div>
+{% endif %}
+{% endif %}
+
+{% if event_batting and event_batting.splits %}
+<div class="section-title">Splits (as hitter)</div>
+<details open>
+  <summary class="section-sub" style="cursor:pointer;">By Opponent</summary>
+  <div class="splits-table-wrap">
+  <table class="stat-table">
+    <thead><tr><th>Opponent</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'HR'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th></tr></thead>
+    <tbody>
+    {% for s in event_batting.splits.byOpponent %}
+      <tr>
+        <td>{{ s.key }}</td>
+        <td>{{ s.outcomes.plateAppearances }}</td>
+        <td>{{ s.outcomes.atBats }}</td>
+        <td>{{ s.outcomes.hits }}</td>
+        <td>{{ s.outcomes.homeRuns }}</td>
+        <td>{{ s.outcomes.battingAverage|fmt3 }}</td>
+        <td>{{ s.outcomes.onBasePercentage|fmt3 }}</td>
+        <td>{{ s.outcomes.sluggingPercentage|fmt3 }}</td>
+        <td>{{ s.outcomes.onBasePlusSlugging|fmt3 }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</details>
+
+{% if event_batting.splits.byPitcherHandedness %}
+<details>
+  <summary class="section-sub" style="cursor:pointer; margin-top:16px;">Vs. Pitcher Handedness</summary>
+  <div class="splits-table-wrap">
+  <table class="stat-table">
+    <thead><tr><th>Throws</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th></tr></thead>
+    <tbody>
+    {% for s in event_batting.splits.byPitcherHandedness %}
+      <tr>
+        <td>{{ s.key|capitalize }}</td>
+        <td>{{ s.outcomes.plateAppearances }}</td>
+        <td>{{ s.outcomes.atBats }}</td>
+        <td>{{ s.outcomes.hits }}</td>
+        <td>{{ s.outcomes.battingAverage|fmt3 }}</td>
+        <td>{{ s.outcomes.onBasePercentage|fmt3 }}</td>
+        <td>{{ s.outcomes.sluggingPercentage|fmt3 }}</td>
+        <td>{{ s.outcomes.onBasePlusSlugging|fmt3 }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</details>
+{% endif %}
+
+{% set known_splits = ["byOpponent", "byPitcherHandedness"] %}
+{% for split_key, split_rows in event_batting.splits.items() %}
+{% if split_key not in known_splits and split_rows %}
+<details>
+  <summary class="section-sub" style="cursor:pointer; margin-top:16px;">{{ split_key|replace('by', '')|replace('_', ' ') }}</summary>
+  <div class="splits-table-wrap">
+  <table class="stat-table">
+    <thead><tr><th>Split</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th></tr></thead>
+    <tbody>
+    {% for s in split_rows %}
+      <tr>
+        <td>{{ s.key }}</td>
+        <td>{{ s.outcomes.plateAppearances }}</td>
+        <td>{{ s.outcomes.atBats }}</td>
+        <td>{{ s.outcomes.hits }}</td>
+        <td>{{ s.outcomes.battingAverage|fmt3 }}</td>
+        <td>{{ s.outcomes.onBasePercentage|fmt3 }}</td>
+        <td>{{ s.outcomes.sluggingPercentage|fmt3 }}</td>
+        <td>{{ s.outcomes.onBasePlusSlugging|fmt3 }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</details>
+{% endif %}
+{% endfor %}
+{% endif %}
+
+<div class="note">
+  Pitch type, velocity, and precise pitch/batted-ball location aren't recorded by CBL's scorekeeping system,
+  so this page shows rate-based and batted-ball-category profiles rather than a Statcast-style spray chart or exit-velocity readings.
+</div>
+
+</div><!-- /tab-overview -->
+
+{% if b_row or pitcher_game_log %}
+<div id="tab-gamelog" style="display:none;">
+
+  {% if b_row %}
+  {% if game_log_coverage %}
+  <div class="note" style="border: 1px solid var(--brick); padding: 10px 14px; margin: 0 0 20px; font-style: normal;">
+    <b>Heads up:</b> this Game Log found {{ game_log_coverage.games_logged }} completed game{{ 's' if game_log_coverage.games_logged != 1 }}
+    for this player, but CBL's official stats say {{ game_log_coverage.official_games }} game{{ 's' if game_log_coverage.official_games != 1 }} played
+    ({{ game_log_coverage.missing }} game{{ 's' if game_log_coverage.missing != 1 }} {{ 'missing' if game_log_coverage.missing > 0 else 'extra' }}
+    from this log). The <b>Overview tab's AVG/OBP/SLG/OPS are correct</b> &mdash; those come straight from
+    CBL's official season stats, not from this page.
+    {% if game_log_coverage.official_avg is not none %}
+    The Season totals row <i>below</i> is independently built by summing every completed game found here,
+    so with games missing it won't match: official AVG is {{ game_log_coverage.official_avg|fmt3 }}, this
+    log's summed AVG is {{ game_log_coverage.logged_avg|fmt3 if game_log_coverage.logged_avg is not none else "---" }}.
+    {% endif %}
+    A missing game is usually a schedule-listing mismatch (team name or status spelled slightly differently
+    for that one game) &mdash; see <span class="mono">gamelog.py</span>'s <span class="mono">team_games()</span>.
+  </div>
+  {% endif %}
+  {% if rolling_stats %}
+  <div class="section-title">Rolling Stats</div>
+  <div class="section-sub">Based on {{ rolling_stats.games_available }} completed game{{ 's' if rolling_stats.games_available != 1 }} logged this season</div>
+  <div class="stat-line" style="margin-top:0;">
+    <div class="stat"><div class="v">{{ rolling_stats.hit_streak }}</div><div class="k">Hit Streak</div></div>
+    <div class="stat"><div class="v">{{ rolling_stats.on_base_streak }}</div><div class="k">On-Base Streak</div></div>
+  </div>
+  <table class="stat-table" style="margin-bottom:8px;">
+    <thead><tr>
+      <th>Window</th><th>{{ 'G'|abbr }}</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'HR'|abbr }}</th><th>{{ 'RBI'|abbr }}</th>
+      <th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
+    </tr></thead>
+    <tbody>
+      {% for key, label in [("last_5", "Last 5 Games"), ("last_10", "Last 10 Games"), ("last_15", "Last 15 Games"), ("last_30_days", "Last 30 Days"), ("last_30_pa", "Last 30 PA"), ("last_50_pa", "Last 50 PA")] %}
+      {% set s = rolling_stats[key] %}
+      <tr>
+        <td><b>{{ label }}</b></td>
+        <td>{{ s.games }}</td><td>{{ s.pa }}</td><td>{{ s.ab }}</td><td>{{ s.h }}</td>
+        <td>{{ s.hr }}</td><td>{{ s.rbi }}</td>
+        <td>{{ s.avg|fmt3 }}</td><td>{{ s.obp|fmt3 }}</td><td>{{ s.slg|fmt3 }}</td><td>{{ s.ops|fmt3 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="note" style="margin-top:0; margin-bottom:26px;">
+    Hit/On-Base streaks and "last N games" windows only count games this player actually appeared in
+    (DNPs don't break a streak, matching the usual convention). "Last 30 Days" is a calendar window
+    ending at the player's most recent logged game, not literally today. On-base here is H + BB only
+    &mdash; HBP isn't tracked at the per-game level, see the Game Log note below.
+  </div>
+  {% endif %}
+
+  <div class="section-title">Home / Away Splits</div>
+  {% if home_away %}
+  <table class="stat-table" style="margin-bottom:8px;">
+    <thead><tr>
+      <th>Split</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ '2B'|abbr }}</th><th>{{ '3B'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+      <th>{{ 'RBI'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
+    </tr></thead>
+    <tbody>
+      {% for key, label in [("home", "Home"), ("away", "Away")] %}
+      {% set s = home_away[key] %}
+      <tr>
+        <td><b>{{ label }}</b></td>
+        <td>{{ s.pa }}</td><td>{{ s.ab }}</td><td>{{ s.h }}</td>
+        <td>{{ s.doubles }}</td><td>{{ s.triples }}</td><td>{{ s.hr }}</td>
+        <td>{{ s.rbi }}</td><td>{{ s.bb }}</td><td>{{ s.so }}</td>
+        <td>{{ s.avg|fmt3 }}</td><td>{{ s.obp|fmt3 }}</td><td>{{ s.slg|fmt3 }}</td><td>{{ s.ops|fmt3 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">Home/away splits aren't available right now.</div>
+  {% endif %}
+
+  {% if park_splits %}
+  <div class="section-title" style="margin-top:20px;">Park Splits</div>
+  <div class="section-sub">Every park played at this season &middot; uses CBL's own venue field when a game has one, otherwise labeled by home team</div>
+  <table class="stat-table" style="margin-bottom:8px;">
+    <thead><tr>
+      <th>Park</th><th>{{ 'G'|abbr }}</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+      <th>{{ 'RBI'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
+    </tr></thead>
+    <tbody>
+      {% for p in park_splits %}
+      <tr>
+        <td><b>{{ p.park }}</b></td>
+        <td>{{ p.games }}</td><td>{{ p.pa }}</td><td>{{ p.ab }}</td><td>{{ p.h }}</td><td>{{ p.hr }}</td>
+        <td>{{ p.rbi }}</td>
+        <td>{{ p.avg|fmt3 }}</td><td>{{ p.obp|fmt3 }}</td><td>{{ p.slg|fmt3 }}</td><td>{{ p.ops|fmt3 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if umpire_splits %}
+  <div class="section-title" style="margin-top:20px;">Umpire Splits</div>
+  <div class="section-sub">By home plate umpire this season &middot; games with no identifiable umpire on record are excluded, not lumped into an "Unknown" row</div>
+  <table class="stat-table" style="margin-bottom:8px;">
+    <thead><tr>
+      <th>Umpire</th><th>{{ 'G'|abbr }}</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+      <th>{{ 'RBI'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
+    </tr></thead>
+    <tbody>
+      {% for u in umpire_splits %}
+      <tr>
+        <td><b>{{ u.umpire }}</b></td>
+        <td>{{ u.games }}</td><td>{{ u.pa }}</td><td>{{ u.ab }}</td><td>{{ u.h }}</td><td>{{ u.hr }}</td>
+        <td>{{ u.rbi }}</td><td>{{ u.bb }}</td><td>{{ u.so }}</td>
+        <td>{{ u.avg|fmt3 }}</td><td>{{ u.obp|fmt3 }}</td><td>{{ u.slg|fmt3 }}</td><td>{{ u.ops|fmt3 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <div class="section-title">Game Log</div>
+  <div class="section-sub">2026 Summer Season &middot; grouped by month, per-game rate stats</div>
+
+  {% if not game_log or not game_log.months %}
+    <div class="empty-state">No completed games found for this player yet.</div>
+  {% else %}
+  <table class="stat-table">
+    <thead><tr>
+      <th>Date</th><th>Opp</th>
+      <th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ '2B'|abbr }}</th><th>{{ '3B'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+      <th>{{ 'RBI'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
+    </tr></thead>
+    <tbody>
+      {% for month, bucket in game_log.months.items() %}
+      <tr class="month-header-row"><td colspan="16"><b>{{ month }}</b></td></tr>
+      {% for r in bucket.rows %}
+      <tr>
+        <td class="mono">{% if r.public_game_id %}<a href="{{ url_for('game_page', public_game_id=r.public_game_id) }}">{{ r.date }}</a>{% else %}{{ r.date }}{% endif %}</td>
+        <td class="team-tag">{{ 'vs' if r.is_home else '@' }} {{ r.opponent }}</td>
+        <td>{{ r.pa }}</td><td>{{ r.ab }}</td><td>{{ r.r }}</td><td>{{ r.h }}</td>
+        <td>{{ r.doubles }}</td><td>{{ r.triples }}</td><td>{{ r.hr }}</td>
+        <td>{{ r.rbi }}</td><td>{{ r.bb }}</td><td>{{ r.so }}</td>
+        <td>{{ r.avg|fmt3 }}</td><td>{{ r.obp|fmt3 }}</td><td>{{ r.slg|fmt3 }}</td><td>{{ r.ops|fmt3 }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="month-total-row">
+        <td colspan="2"><b>{{ month }} totals</b></td>
+        <td>{{ bucket.totals.pa }}</td><td>{{ bucket.totals.ab }}</td><td>{{ bucket.totals.r }}</td><td>{{ bucket.totals.h }}</td>
+        <td>{{ bucket.totals.doubles }}</td><td>{{ bucket.totals.triples }}</td><td>{{ bucket.totals.hr }}</td>
+        <td>{{ bucket.totals.rbi }}</td><td>{{ bucket.totals.bb }}</td><td>{{ bucket.totals.so }}</td>
+        <td>{{ bucket.totals.avg|fmt3 }}</td><td>{{ bucket.totals.obp|fmt3 }}</td><td>{{ bucket.totals.slg|fmt3 }}</td><td>{{ bucket.totals.ops|fmt3 }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="season-total-row">
+        <td colspan="2"><b>Season totals</b></td>
+        <td>{{ game_log.season_totals.pa }}</td><td>{{ game_log.season_totals.ab }}</td><td>{{ game_log.season_totals.r }}</td><td>{{ game_log.season_totals.h }}</td>
+        <td>{{ game_log.season_totals.doubles }}</td><td>{{ game_log.season_totals.triples }}</td><td>{{ game_log.season_totals.hr }}</td>
+        <td>{{ game_log.season_totals.rbi }}</td><td>{{ game_log.season_totals.bb }}</td><td>{{ game_log.season_totals.so }}</td>
+        <td>{{ game_log.season_totals.avg|fmt3 }}</td><td>{{ game_log.season_totals.obp|fmt3 }}</td><td>{{ game_log.season_totals.slg|fmt3 }}</td><td>{{ game_log.season_totals.ops|fmt3 }}</td>
+      </tr>
+    </tbody>
+  </table>
+  {% endif %}
+
+  <div class="note">
+    Per-game AVG/OBP/SLG/OPS are single-game rates (hits/at-bats for that game only), the same convention
+    MLB's Gameday log uses &mdash; they look extreme on small samples like 1-for-1. Home/Away and monthly
+    totals are season-to-date.
+  </div>
+  {% endif %}
+
+  {% if pitcher_game_log %}
+  {% if pitcher_game_log_coverage %}
+  <div class="note" style="border: 1px solid var(--brick); padding: 10px 14px; margin: {{ '32px' if b_row else '0' }} 0 20px; font-style: normal;">
+    <b>Heads up:</b> this Pitching Game Log found {{ pitcher_game_log_coverage.games_logged }} completed appearance{{ 's' if pitcher_game_log_coverage.games_logged != 1 }}
+    for this player, but CBL's official stats say {{ pitcher_game_log_coverage.official_games }} game{{ 's' if pitcher_game_log_coverage.official_games != 1 }} pitched
+    ({{ pitcher_game_log_coverage.missing }} game{{ 's' if pitcher_game_log_coverage.missing != 1 }} {{ 'missing' if pitcher_game_log_coverage.missing > 0 else 'extra' }}
+    from this log). The <b>Overview tab's ERA/WHIP are correct</b> &mdash; those come straight from CBL's
+    official season stats, not from this page. A missing game is usually a schedule-listing mismatch
+    (team name or status spelled slightly differently for that one game).
+  </div>
+  {% endif %}
+
+  {% if pitcher_park_splits %}
+  <div class="section-title" style="margin-top:{{ '32px' if b_row else '0' }};">Pitching Park Splits</div>
+  <div class="section-sub">Every park pitched at this season &middot; uses CBL's own venue field when a game has one, otherwise labeled by home team &middot; ERA is real earned-run ERA (see Game Log note)</div>
+  <table class="stat-table" style="margin-bottom:8px;">
+    <thead><tr>
+      <th>Park</th><th>{{ 'G'|abbr }}</th><th>{{ 'BF'|abbr }}</th><th>{{ 'IP'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+      <th>{{ 'ERA'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th>
+    </tr></thead>
+    <tbody>
+      {% for p in pitcher_park_splits %}
+      <tr>
+        <td><b>{{ p.park }}</b></td>
+        <td>{{ p.games }}</td><td>{{ p.bf }}</td><td>{{ p.ip }}</td><td>{{ p.h }}</td><td>{{ p.r }}</td><td>{{ p.hr }}</td>
+        <td>{{ p.era|fmt2 }}{{ '*' if not p.era_exact }}</td><td>{{ p.whip|fmt2 if p.whip is not none else "---" }}</td><td>{{ p.avg_against|fmt3 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if pitcher_umpire_splits %}
+  <div class="section-title" style="margin-top:{{ '32px' if b_row else '0' }};">Pitching Umpire Splits</div>
+  <div class="section-sub">By home plate umpire this season &middot; games with no identifiable umpire on record are excluded &middot; ERA is real earned-run ERA (see Game Log note)</div>
+  <table class="stat-table" style="margin-bottom:8px;">
+    <thead><tr>
+      <th>Umpire</th><th>{{ 'G'|abbr }}</th><th>{{ 'BF'|abbr }}</th><th>{{ 'IP'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+      <th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'ERA'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th>
+    </tr></thead>
+    <tbody>
+      {% for u in pitcher_umpire_splits %}
+      <tr>
+        <td><b>{{ u.umpire }}</b></td>
+        <td>{{ u.games }}</td><td>{{ u.bf }}</td><td>{{ u.ip }}</td><td>{{ u.h }}</td><td>{{ u.r }}</td><td>{{ u.hr }}</td>
+        <td>{{ u.bb }}</td><td>{{ u.so }}</td>
+        <td>{{ u.era|fmt2 }}{{ '*' if not u.era_exact }}</td><td>{{ u.whip|fmt2 if u.whip is not none else "---" }}</td><td>{{ u.avg_against|fmt3 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <div class="section-title" style="margin-top:{{ '32px' if b_row else '0' }};">Pitching Game Log</div>
+  <div class="section-sub">2026 Summer Season &middot; grouped by month, per-appearance line &middot; ERA uses CBL's own per-game earned-run data (see note below) &mdash; not the runs-allowed-based ERA* used in Park/Umpire/situational splits elsewhere on this page</div>
+  {% if pitcher_scoreless_streak and pitcher_scoreless_streak >= 2 %}
+  <div class="section-sub" style="color:var(--gold); font-weight:600;">Current streak: {{ pitcher_scoreless_streak }} straight scoreless appearances</div>
+  {% endif %}
+
+  {% if not pitcher_game_log.months %}
+    <div class="empty-state">No completed pitching appearances found for this player yet.</div>
+  {% else %}
+  <table class="stat-table">
+    <thead><tr>
+      <th>Date</th><th>Opp</th>
+      <th>{{ 'BF'|abbr }}</th><th>{{ 'IP'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+      <th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'ERA'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th>
+    </tr></thead>
+    <tbody>
+      {% for month, bucket in pitcher_game_log.months.items() %}
+      <tr class="month-header-row"><td colspan="12"><b>{{ month }}</b></td></tr>
+      {% for r in bucket.rows %}
+      <tr>
+        <td class="mono">{% if r.public_game_id %}<a href="{{ url_for('game_page', public_game_id=r.public_game_id) }}">{{ r.date }}</a>{% else %}{{ r.date }}{% endif %}</td>
+        <td class="team-tag">{{ 'vs' if r.is_home else '@' }} {{ r.opponent }}</td>
+        <td>{{ r.bf }}</td><td>{{ r.ip }}</td><td>{{ r.h }}</td><td>{{ r.r }}</td><td>{{ r.hr }}</td>
+        <td>{{ r.bb }}</td><td>{{ r.so }}</td>
+        <td>{{ r.era|fmt2 }}{{ '*' if not r.era_exact }}</td><td>{{ r.whip|fmt2 if r.whip is not none else "---" }}</td><td>{{ r.avg_against|fmt3 }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="month-total-row">
+        <td colspan="2"><b>{{ month }} totals</b></td>
+        <td>{{ bucket.totals.bf }}</td><td>{{ bucket.totals.ip }}</td><td>{{ bucket.totals.h }}</td><td>{{ bucket.totals.r }}</td><td>{{ bucket.totals.hr }}</td>
+        <td>{{ bucket.totals.bb }}</td><td>{{ bucket.totals.so }}</td>
+        <td>{{ bucket.totals.era|fmt2 }}{{ '*' if not bucket.totals.era_exact }}</td><td>{{ bucket.totals.whip|fmt2 if bucket.totals.whip is not none else "---" }}</td><td>{{ bucket.totals.avg_against|fmt3 }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="season-total-row">
+        <td colspan="2"><b>Season totals</b></td>
+        <td>{{ pitcher_game_log.season_totals.bf }}</td><td>{{ pitcher_game_log.season_totals.ip }}</td><td>{{ pitcher_game_log.season_totals.h }}</td><td>{{ pitcher_game_log.season_totals.r }}</td><td>{{ pitcher_game_log.season_totals.hr }}</td>
+        <td>{{ pitcher_game_log.season_totals.bb }}</td><td>{{ pitcher_game_log.season_totals.so }}</td>
+        <td>{{ pitcher_game_log.season_totals.era|fmt2 }}{{ '*' if not pitcher_game_log.season_totals.era_exact }}</td><td>{{ pitcher_game_log.season_totals.whip|fmt2 if pitcher_game_log.season_totals.whip is not none else "---" }}</td><td>{{ pitcher_game_log.season_totals.avg_against|fmt3 }}</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="note">
+    ERA here uses CBL's own per-game earned-run total for each appearance &mdash; real earned-run ERA, not an
+    approximation. A <b>*</b> next to a specific value means CBL's per-game earned-run data wasn't available for
+    at least one game in that row/month/season, so this app treated every run in that game as earned rather than
+    guess at the split &mdash; a purely honest fallback for a rare gap, not the default anymore.
+  </div>
+  {% endif %}
+
+  <div class="note">
+    "ERA*" here is runs-allowed-per-9 (all runs charged while this pitcher was on the mound that game),
+    not true earned-run ERA &mdash; the feed doesn't separate earned from unearned runs per play, only
+    in the season totals. AVG is batting average allowed. Monthly and season totals are season-to-date.
+  </div>
+  {% endif %}
+
+</div><!-- /tab-gamelog -->
+{% endif %}
+
+{% if season_splits or pitcher_season_splits %}
+<div id="tab-splits" style="display:none;">
+
+  {% if b_row and not p_row %}
+  {% if event_batting and event_batting.splits and event_batting.splits.byPitcherHandedness %}
+  <div class="section-title">Platoon Splits</div>
+  <div class="section-sub">Vs. pitcher handedness &middot; from CBL's player analytics feed</div>
+  <div class="splits-table-wrap">
+  <table class="stat-table">
+    <thead><tr><th>Vs.</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'HR'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th></tr></thead>
+    <tbody>
+    {% for s in event_batting.splits.byPitcherHandedness %}
+      <tr>
+        <td>{{ s.key|capitalize }}-Handed Pitchers</td>
+        <td>{{ s.outcomes.plateAppearances }}</td>
+        <td>{{ s.outcomes.atBats }}</td>
+        <td>{{ s.outcomes.hits }}</td>
+        <td>{{ s.outcomes.homeRuns }}</td>
+        <td>{{ s.outcomes.battingAverage|fmt3 }}</td>
+        <td>{{ s.outcomes.onBasePercentage|fmt3 }}</td>
+        <td>{{ s.outcomes.sluggingPercentage|fmt3 }}</td>
+        <td>{{ s.outcomes.onBasePlusSlugging|fmt3 }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+
+  {% if season_splits %}
+    {% for section_title, rows in season_splits.items() %}
+      {{ split_table(section_title, rows) }}
+    {% endfor %}
+  {% endif %}
+  {% endif %}
+
+  {% if pitcher_season_splits %}
+  {% if event_pitching and event_pitching.splits and event_pitching.splits.byOpponent %}
+  <div class="section-title" style="margin-top:26px;">Pitching: Vs. Opponent</div>
+  <div class="section-sub">How this pitcher has performed against each specific team &middot; from CBL's player analytics feed</div>
+  <div class="splits-table-wrap">
+  <table class="stat-table">
+    <thead><tr><th>Opponent</th><th>{{ 'BF'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'HR'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'AVG'|abbr }}</th></tr></thead>
+    <tbody>
+    {% for s in event_pitching.splits.byOpponent %}
+      <tr>
+        <td><a href="{{ url_for('team_roster', team_name=s.key) }}">{{ s.key }}</a></td>
+        <td>{{ s.outcomes.plateAppearances or s.outcomes.battersFaced or s.outcomes.batters_faced or s.outcomes.bf or 0 }}</td>
+        <td>{{ s.outcomes.hits }}</td>
+        <td>{{ s.outcomes.homeRuns }}</td>
+        <td>{{ s.outcomes.walks }}</td>
+        <td>{{ s.outcomes.strikeouts }}</td>
+        <td>{{ s.outcomes.battingAverage|fmt3 }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+
+  {% if event_pitching and event_pitching.splits and event_pitching.splits.byBatterHandedness %}
+  <div class="section-title" style="margin-top:26px;">Pitching: Platoon Splits</div>
+  <div class="section-sub">Vs. batter handedness &middot; from CBL's player analytics feed</div>
+  <div class="splits-table-wrap">
+  <table class="stat-table">
+    <thead><tr><th>Vs.</th><th>{{ 'BF'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'HR'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'AVG'|abbr }}</th></tr></thead>
+    <tbody>
+    {% for s in event_pitching.splits.byBatterHandedness %}
+      <tr>
+        <td>{{ s.key|capitalize }}-Handed Batters</td>
+        <td>{{ s.outcomes.plateAppearances or s.outcomes.battersFaced or s.outcomes.batters_faced or s.outcomes.bf or 0 }}</td>
+        <td>{{ s.outcomes.hits }}</td>
+        <td>{{ s.outcomes.homeRuns }}</td>
+        <td>{{ s.outcomes.walks }}</td>
+        <td>{{ s.outcomes.strikeouts }}</td>
+        <td>{{ s.outcomes.battingAverage|fmt3 }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+
+  <div class="section-title" style="margin-top:26px;">Pitching Splits</div>
+  {% for section_title, rows in pitcher_season_splits.items() %}
+    {{ pitch_split_table(section_title, rows) }}
+  {% endfor %}
+  <div class="note">
+    "ERA" in these pitching splits is runs-allowed-per-9 (all runs while this pitcher was on the
+    mound), not true earned-run ERA &mdash; CBL's feed doesn't separate earned from unearned runs
+    per play, only in the season totals. AVG is batting average allowed (H / (BF &minus; BB), HBP
+    not tracked). Platoon (vs. batter handedness) splits above only appear if CBL's analytics
+    endpoint provides them &mdash; the raw play-by-play log has no batter-handedness field to derive
+    them from directly.
+  </div>
+  {% endif %}
+
+  {% if not (season_splits and not p_row) and not pitcher_season_splits %}
+  <div class="empty-state" style="margin-top:20px;">Splits aren't available right now.</div>
+  {% endif %}
+
+  {% if season_splits and not p_row %}
+  <div class="note">
+    Baserunner, outs, inning, batting-order, and game-type splits are derived from every completed
+    game's pitch-by-pitch at-bat log for this team this season. Stolen bases/caught stealing aren't
+    recorded by CBL's scorekeeping, and "Late &amp; Close" isn't broken out yet &mdash; see the README.
+  </div>
+  {% endif %}
+
+</div><!-- /tab-splits -->
+{% endif %}
+
+{% if batting_adv or pitching_adv %}
+<div id="tab-advanced" style="display:none;">
+
+  {% if batting_adv %}
+  <div class="section-title">Advanced Batting</div>
+  <div class="section-sub">Rated against this league's qualified-hitter pool &middot; see Overview tab note for percentile ranks</div>
+  <div class="kv-grid">
+    {{ kv("OPS", batting_adv.ops|fmt3) }}
+    {{ kv("OBP", batting_adv.obp|fmt3) }}
+    {{ kv("SLG", batting_adv.slg|fmt3) }}
+    {{ kv("ISO (Isolated Power)", batting_adv.iso|fmt3) }}
+    {{ kv("BABIP", batting_adv.babip|fmt3) }}
+    {{ kv("wOBA", batting_adv.woba|fmt3) }}
+    {{ kv("OPS+", batting_adv.ops_plus if batting_adv.ops_plus is not none else "---") }}
+    {{ kv("Runs Created (RC)", batting_adv.rc|fmt1 if batting_adv.rc is not none else "---") }}
+    {{ kv("RC per Game", batting_adv.rc_per_game|fmt2 if batting_adv.rc_per_game is not none else "---") }}
+    {% if quality_pa and quality_pa.total_pa %}
+    {{ kv("Quality PA %", (quality_pa.pct|fmt3) ~ " (" ~ quality_pa.quality_pa_count ~ "/" ~ quality_pa.total_pa ~ ")") }}
+    {% endif %}
+    {{ kv("Estimated wRC", batting_adv.est_wrc if batting_adv.est_wrc is not none else "---") }}
+    {{ kv("Batting Runs Above Avg (est.)", batting_adv.batting_runs_above_avg if batting_adv.batting_runs_above_avg is not none else "---") }}
+    {{ kv("Secondary Average", batting_adv.seca|fmt3 if batting_adv.seca is not none else "---") }}
+    {{ kv("Total Bases", batting_adv.tb) }}
+    {{ kv("Extra Base Hits", batting_adv.xbh) }}
+    {{ kv("XBH %", batting_adv.xbh_pct|fmt_pct if batting_adv.xbh_pct is not none else "---") }}
+    {{ kv("Extra Bases per Hit", batting_adv.extra_bases_per_hit|fmt2 if batting_adv.extra_bases_per_hit is not none else "---") }}
+  </div>
+  {% if quality_pa and quality_pa.total_pa %}
+  <div class="note">
+    A plate appearance counts as "quality" if it's a hit, walk, or HBP; a hard-hit ball even if it's an out;
+    a sacrifice fly/bunt or any PA where a run scored; reaching a 6+ pitch count; or battling back from
+    an 0-2 count to survive 3+ more pitches. Not counted: a plain groundout that merely advances a runner
+    without scoring &mdash; this feed doesn't carry before/after base state to verify that specific case.
+  </div>
+  {% endif %}
+
+  {% if batted_ball_profile and batted_ball_profile.total %}
+  <div class="section-title" style="margin-top:26px;">Batted Ball Profile</div>
+  <div class="section-sub">{{ batted_ball_profile.total }} batted balls tracked this season &middot; from CBL's own per-play battedBall data</div>
+  <div class="kv-grid">
+    {{ kv("Ground Ball %", batted_ball_profile.by_type_pct.ground_ball|fmt_pct) }}
+    {{ kv("Line Drive %", batted_ball_profile.by_type_pct.line_drive|fmt_pct) }}
+    {{ kv("Fly Ball %", batted_ball_profile.by_type_pct.fly_ball|fmt_pct) }}
+    {{ kv("Popup %", batted_ball_profile.by_type_pct.popup|fmt_pct) }}
+    {{ kv("Left Field %", batted_ball_profile.by_direction_pct.left|fmt_pct) }}
+    {{ kv("Center Field %", batted_ball_profile.by_direction_pct.center|fmt_pct) }}
+    {{ kv("Right Field %", batted_ball_profile.by_direction_pct.right|fmt_pct) }}
+  </div>
+  <div class="note">
+    Direction is CBL's own raw left/center/right field labeling, not adjusted for batter handedness --
+    it doesn't know or infer which side is this player's "pull" side, so a left-handed hitter's pull
+    field would actually be Right here, not Left. Batted balls with no type/direction recorded aren't
+    shown as separate rows but are included in the total.
+  </div>
+  {% endif %}
+
+  <div class="section-title" style="margin-top:26px;">Plate Discipline</div>
+  <div class="kv-grid">
+    {{ kv("K %", batting_adv.k_pct|fmt_pct if batting_adv.k_pct is not none else "---") }}
+    {{ kv("BB %", batting_adv.bb_pct|fmt_pct if batting_adv.bb_pct is not none else "---") }}
+    {{ kv("K &minus; BB %", batting_adv.k_minus_bb_pct|fmt_pct if batting_adv.k_minus_bb_pct is not none else "---") }}
+    {{ kv("BB / K Ratio", batting_adv.bb_so_ratio|fmt2 if batting_adv.bb_so_ratio is not none else "---") }}
+    {{ kv("PA per Strikeout", batting_adv.pa_per_so|fmt1 if batting_adv.pa_per_so is not none else "---") }}
+    {{ kv("PA per Walk", batting_adv.pa_per_bb|fmt1 if batting_adv.pa_per_bb is not none else "---") }}
+    {% if batter_first_pitch and batter_first_pitch.pa %}
+    {{ kv("First Pitch Swing %", batter_first_pitch.first_pitch_swing_pct|fmt_pct) }}
+    {{ kv("First Pitch Take %", batter_first_pitch.first_pitch_take_pct|fmt_pct) }}
+    {% endif %}
+  </div>
+  <div class="note">
+    Two-strike contact % and productive-PA % still aren't included &mdash; they'd need a full
+    two-strike-count reconstruction across every pitch of the season, which isn't wired up yet.
+    First-pitch swing/take % above is walked from the raw pitch sequence of every completed game
+    this player batted in{% if batter_first_pitch %} ({{ batter_first_pitch.pa }} plate appearances
+    with pitch data found){% endif %}; see <span class="mono">pitch_discipline.py</span> for exactly
+    how a "swing" is identified.
+  </div>
+
+  <div class="section-title" style="margin-top:26px;">Baserunning</div>
+  {% if stolen_bases and stolen_bases.available %}
+  <div class="kv-grid">
+    {{ kv("Stolen Bases", stolen_bases.sb) }}
+    {{ kv("Caught Stealing", stolen_bases.cs) }}
+    {{ kv("Stolen Base %", stolen_bases.sb_pct|fmt_pct if stolen_bases.sb_pct is not none else "---") }}
+  </div>
+  {% else %}
+  <div class="note" style="margin-top:0;">
+    Stolen base / caught stealing data isn't available for this player &mdash; this app couldn't find
+    any play-by-play event data in the completed games it checked this season (not specifically a
+    missing steal event; see <span class="mono">baserunning.py</span> / <span class="mono">gameday.py</span>).
+  </div>
+  {% endif %}
+  {% endif %}
+
+  {% if pitching_adv %}
+  <div class="section-title" style="margin-top:32px;">Advanced Pitching</div>
+  <div class="section-sub">FIP constant &amp; xFIP league HR/FB rate derived from this league's own qualified-pitcher pool</div>
+  <div class="kv-grid">
+    {{ kv("ERA", pitching_adv.era|fmt2) }}
+    {{ kv("WHIP", pitching_adv.whip|fmt2 if pitching_adv.whip is not none else "---") }}
+    {{ kv("FIP", pitching_adv.fip|fmt2 if pitching_adv.fip is not none else "---") }}
+    {{ kv("xFIP", pitching_adv.xfip|fmt2 if pitching_adv.xfip is not none else "---") }}
+    {{ kv("ERA+", pitching_adv.era_plus if pitching_adv.era_plus is not none else "---") }}
+    {{ kv("K/9", pitching_adv.k9|fmt2 if pitching_adv.k9 is not none else "---") }}
+    {{ kv("BB/9", pitching_adv.bb9|fmt2 if pitching_adv.bb9 is not none else "---") }}
+    {{ kv("HR/9", pitching_adv.hr9|fmt2 if pitching_adv.hr9 is not none else "---") }}
+    {{ kv("K %", pitching_adv.k_pct|fmt_pct if pitching_adv.k_pct is not none else "---") }}
+    {{ kv("BB %", pitching_adv.bb_pct|fmt_pct if pitching_adv.bb_pct is not none else "---") }}
+    {{ kv("K &minus; BB %", pitching_adv.k_minus_bb_pct|fmt_pct if pitching_adv.k_minus_bb_pct is not none else "---") }}
+    {{ kv("BABIP Against", pitching_adv.babip_against|fmt3 if pitching_adv.babip_against is not none else "---") }}
+    {{ kv("Ground Ball %", pitching_adv.gb_pct|fmt_pct if pitching_adv.gb_pct is not none else "---") }}
+    {{ kv("Fly Ball %", pitching_adv.fb_pct|fmt_pct if pitching_adv.fb_pct is not none else "---") }}
+    {{ kv("GB / FB Ratio", pitching_adv.gb_fb_ratio|fmt2 if pitching_adv.gb_fb_ratio is not none else "---") }}
+    {% if pitcher_start_totals %}
+    {{ kv("Starts", pitcher_start_totals.starts) }}
+    {{ kv("Quality Starts", pitcher_start_totals.quality_starts) }}
+    {% endif %}
+    {% if pitcher_first_pitch and pitcher_first_pitch.bf %}
+    {{ kv("First Pitch Strike %", pitcher_first_pitch.first_pitch_strike_pct|fmt_pct) }}
+    {{ kv("First Pitch Ball %", pitcher_first_pitch.first_pitch_ball_pct|fmt_pct) }}
+    {% endif %}
+  </div>
+  <div class="note">
+    GB%/FB% here are outs-based (ground outs vs. air outs from the season pitching line), not a full
+    batted-ball-type breakdown &mdash; balls that fell in for hits aren't categorized by type at the
+    season-stat level today. Quality Starts uses all runs allowed (not earned-only) against the usual
+    6+ IP / &le;3 runs threshold, since the feed doesn't separate earned from unearned runs per play
+    &mdash; see <span class="mono">pitching_splits.py</span>. First-pitch strike/ball % is walked from
+    the raw pitch sequence{% if pitcher_first_pitch %} ({{ pitcher_first_pitch.bf }} batters faced with
+    pitch data found){% endif %}.
+  </div>
+
+  {% if pitcher_extra_stats %}
+  <div class="section-title" style="margin-top:26px;">Opponent Line &amp; Pitch Mix</div>
+  <div class="section-sub">Aggregated from CBL's own per-game pitching stats across {{ pitcher_extra_stats.bf }} batters faced</div>
+  <div class="kv-grid">
+    {{ kv("Opponent AVG", pitcher_extra_stats.opp_avg|fmt3 if pitcher_extra_stats.opp_avg is not none else "---") }}
+    {{ kv("Opponent OBP", pitcher_extra_stats.opp_obp|fmt3 if pitcher_extra_stats.opp_obp is not none else "---") }}
+    {{ kv("Opponent SLG", pitcher_extra_stats.opp_slg|fmt3 if pitcher_extra_stats.opp_slg is not none else "---") }}
+    {{ kv("Opponent OPS", pitcher_extra_stats.opp_ops|fmt3 if pitcher_extra_stats.opp_ops is not none else "---") }}
+    {{ kv("Opponent ISO", pitcher_extra_stats.opp_iso|fmt3 if pitcher_extra_stats.opp_iso is not none else "---") }}
+    {{ kv("Opponent wOBA", pitcher_extra_stats.opp_woba|fmt3 if pitcher_extra_stats.opp_woba is not none else "---") }}
+    {{ kv("Left On Base %", pitcher_extra_stats.lob_pct|fmt_pct if pitcher_extra_stats.lob_pct is not none else "---") }}
+    {{ kv("Strike %", pitcher_extra_stats.strike_pct|fmt_pct if pitcher_extra_stats.strike_pct is not none else "---") }}
+    {{ kv("Ball %", pitcher_extra_stats.ball_pct|fmt_pct if pitcher_extra_stats.ball_pct is not none else "---") }}
+    {{ kv("Called Strike %", pitcher_extra_stats.called_strike_pct|fmt_pct if pitcher_extra_stats.called_strike_pct is not none else "---") }}
+    {{ kv("Swinging Strike %", pitcher_extra_stats.swinging_strike_pct|fmt_pct if pitcher_extra_stats.swinging_strike_pct is not none else "---") }}
+    {{ kv("K Looking %", pitcher_extra_stats.k_looking_pct|fmt_pct if pitcher_extra_stats.k_looking_pct is not none else "---") }}
+    {{ kv("K Swinging %", pitcher_extra_stats.k_swinging_pct|fmt_pct if pitcher_extra_stats.k_swinging_pct is not none else "---") }}
+  </div>
+  <div class="note">
+    All numbers on this card are summed from CBL's own real per-game pitching stats (pitch-by-pitch
+    ball/strike counts, opponent hit types, etc.), not re-derived from the raw play-by-play &mdash;
+    see <span class="mono">pitching_extra.py</span>. Opponent wOBA uses the same non-league-specific
+    weights as this app's batting wOBA. Left On Base % uses the standard
+    (H+BB+HBP&minus;R)/(H+BB+HBP&minus;1.4&times;HR) formula, with "R" meaning all runs allowed
+    (not earned-only, same caveat as elsewhere in this app).
+  </div>
+
+  {% if pitcher_extra_stats.save_opportunities or pitcher_extra_stats.holds or pitcher_extra_stats.inherited_runners %}
+  <div class="section-title" style="margin-top:26px;">Relief Pitching</div>
+  <div class="kv-grid">
+    {{ kv("Holds", pitcher_extra_stats.holds) }}
+    {{ kv("Hold Rate", pitcher_extra_stats.hold_rate|fmt_pct if pitcher_extra_stats.hold_rate is not none else "---") }}
+    {{ kv("Save Opportunities", pitcher_extra_stats.save_opportunities) }}
+    {{ kv("Blown Saves", pitcher_extra_stats.blown_saves) }}
+    {{ kv("Save Conversion %", pitcher_extra_stats.save_pct|fmt_pct if pitcher_extra_stats.save_pct is not none else "---") }}
+    {{ kv("Inherited Runners", pitcher_extra_stats.inherited_runners) }}
+    {{ kv("Inherited Runners Scored", pitcher_extra_stats.inherited_runners_scored) }}
+    {{ kv("Inherited Runner Scoring %", pitcher_extra_stats.inherited_scoring_pct|fmt_pct if pitcher_extra_stats.inherited_scoring_pct is not none else "---") }}
+  </div>
+  <div class="note">
+    Hold Rate is holds per relief appearance (games &minus; starts from the season stat line) &mdash;
+    CBL doesn't track "hold opportunities" the way it tracks save opportunities, so unlike Save
+    Conversion % this is a rate against total relief outings, not against a defined opportunity count.
+  </div>
+  {% endif %}
+  {% endif %}
+  {% endif %}
+
+</div><!-- /tab-advanced -->
+
+<div id="tab-fielding" style="display:none;">
+  <div class="section-title">Fielding &mdash; By Position</div>
+  <div class="section-sub">Every position played this season, aggregated from each game's own position-by-position breakdown</div>
+  {% if not fielding_position_splits %}
+  <div class="empty-state">No fielding data found for this player yet.</div>
+  {% else %}
+  <table class="stat-table">
+    <thead><tr>
+      <th>Position</th><th>{{ 'G'|abbr }}</th><th>GS</th><th>{{ 'PO'|abbr }}</th><th>{{ 'A'|abbr }}</th><th>{{ 'E'|abbr }}</th>
+      <th>{{ 'TC'|abbr }}</th><th>{{ 'FPCT'|abbr }}</th><th>{{ 'RF'|abbr }}</th><th>{{ 'DP'|abbr }}</th><th>TP</th>
+    </tr></thead>
+    <tbody>
+      {% for p in fielding_position_splits %}
+      <tr>
+        <td><b>{{ p.position }}</b></td>
+        <td>{{ p.games }}</td><td>{{ p.games_started }}</td>
+        <td>{{ p.putouts }}</td><td>{{ p.assists }}</td><td>{{ p.errors }}</td>
+        <td>{{ p.total_chances }}</td><td>{{ p.fielding_pct|fmt3 if p.fielding_pct is not none else "---" }}</td>
+        <td>{{ p.range_factor|fmt2 if p.range_factor is not none else "---" }}</td>
+        <td>{{ p.double_plays }}</td><td>{{ p.triple_plays }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="note">
+    Errors combine fielding and throwing errors into one total, matching how errors are reported everywhere
+    else on this site. "GS" is games started at that specific position; a player who moved positions
+    mid-game is credited at each position separately for that game, not just their starting spot.
+  </div>
+  {% endif %}
+</div><!-- /tab-fielding -->
+{% endif %}
+
+{% if b_row or p_row %}
+<script>
+function showPlayerTab(name, link) {
+  ['overview', 'gamelog', 'splits', 'advanced', 'fielding'].forEach(function(tab) {
+    var el = document.getElementById('tab-' + tab);
+    if (el) el.style.display = (tab === name) ? '' : 'none';
+  });
+  document.querySelectorAll('.player-tab-link').forEach(function(a) { a.classList.remove('active'); });
+  link.classList.add('active');
+  return false;
+}
+</script>
+{% endif %}
+
+{% endblock %}

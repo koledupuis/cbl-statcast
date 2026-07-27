@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Stadiums &middot; CBL Stats{% endblock %}
+
+{% macro sort_link(key, label) %}
+<a href="{{ url_for('leaderboard_stadiums', sort=key) }}" class="sort-link {{ 'active' if active_sort == key }}">{{ label|abbr }}</a>
+{% endmacro %}
+
+{% block content %}
+<div class="section-title">Stadiums</div>
+<div class="section-sub">2026 Summer Season &middot; league-wide batting by park &middot; both teams' hitters combined, since this is about how the park itself plays, not a team stat</div>
+
+<div class="tabs">
+  <a href="{{ url_for('leaderboard_batting') }}" class="{{ 'active' if active=='batting' }}">Batting</a>
+  <a href="{{ url_for('leaderboard_pitching') }}" class="{{ 'active' if active=='pitching' }}">Pitching</a>
+  <a href="{{ url_for('leaderboard_fielding') }}" class="{{ 'active' if active=='fielding' }}">Fielding</a>
+  <a href="{{ url_for('leaderboard_stadiums') }}" class="{{ 'active' if active=='stadiums' }}">Stadiums</a>
+  <a href="{{ url_for('leaderboard_teams') }}" class="{{ 'active' if active=='teams' }}">Teams</a>
+</div>
+
+{% if not rows %}
+  <div class="empty-state">No park data available yet.</div>
+{% else %}
+<table class="stat-table">
+  <thead><tr>
+    <th>#</th><th>Park</th>
+    <th>{{ sort_link('games', 'G') }}</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th>
+    <th>{{ 'H'|abbr }}</th><th>{{ sort_link('hr', 'HR') }}</th><th>{{ sort_link('hr_per_game', 'HR/G') }}</th>
+    <th>{{ 'R'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th>
+    <th>{{ sort_link('avg', 'AVG') }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th>
+    <th>{{ sort_link('ops', 'OPS') }}</th>
+  </tr></thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td class="rank-col">{{ loop.index }}</td>
+      <td><a href="{{ url_for('park_detail', venue_name=r.venue) }}"><b>{{ r.venue }}</b></a></td>
+      <td>{{ r.games }}</td><td>{{ r.pa }}</td><td>{{ r.ab }}</td>
+      <td>{{ r.h }}</td><td>{{ r.hr }}</td><td>{{ r.hr_per_game|fmt2 if r.hr_per_game is not none else "---" }}</td>
+      <td>{{ r.r }}</td><td>{{ r.bb }}</td><td>{{ r.so }}</td>
+      <td>{{ r.avg|fmt3 }}</td><td>{{ r.obp|fmt3 }}</td><td>{{ r.slg|fmt3 }}</td>
+      <td>{{ r.ops|fmt3 }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="note">
+  Every completed plate appearance from both teams at that venue this season, combined -- a higher
+  HR/G or AVG here reflects the park itself (dimensions, wind, background), not any one team's
+  or player's hitting. A game whose venue couldn't be identified is grouped under "Unknown Venue"
+  rather than dropped, so these rows still add up to the season's real completed-game count.
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Compare &middot; CBL Stats{% endblock %}
+
+{% macro compare_table(title, entities, name_key, rows) %}
+{% if rows %}
+<div class="section-title" style="margin-top:28px;">{{ title }}</div>
+<div class="splits-table-wrap">
+<table class="compare-table">
+  <thead>
+    <tr>
+      <th>Stat</th>
+      {% for e in entities %}<th>{{ e[name_key] }}</th>{% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.label|abbr|safe }}</td>
+      {% for cell in row.cells %}
+      <td class="{{ 'best' if cell.is_best }}">{{ cell.display }}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% block content %}
+<div class="section-title">Compare</div>
+<div class="section-sub">Search for any player or team to add them to the comparison &middot; best value in each row is highlighted</div>
+
+<div class="section-title" style="margin-top:26px; font-size:17px;">Players</div>
+<div class="compare-picker">
+  <input type="text" id="player-search" placeholder="Search for a player&hellip;" autocomplete="off">
+  <div class="typeahead-list" id="player-suggestions"></div>
+</div>
+<div class="chip-row" id="player-chips">
+  {% for pid in selected_player_ids %}
+  {% set match = players_compare|selectattr("id", "equalto", pid)|first %}
+  {% if match %}
+  <span class="chip">{{ match.name }} <span class="ta-sub">{{ match.team }}</span> <a onclick="removePlayer('{{ pid }}')">&times;</a></span>
+  {% endif %}
+  {% endfor %}
+</div>
+
+{% if not players_compare %}
+<div class="empty-state" style="padding:16px 0;">No players added yet &mdash; search above to add one.</div>
+{% endif %}
+
+{{ compare_table("Batting", players_compare, "name", batting_rows) }}
+{{ compare_table("Pitching", players_compare, "name", pitching_rows) }}
+
+<div class="section-title" style="margin-top:40px; font-size:17px;">Teams</div>
+<div class="compare-picker">
+  <input type="text" id="team-search" placeholder="Search for a team&hellip;" autocomplete="off">
+  <div class="typeahead-list" id="team-suggestions"></div>
+</div>
+<div class="chip-row" id="team-chips">
+  {% for tname in selected_team_names %}
+  <span class="chip">{{ tname }} <a onclick="removeTeam('{{ tname }}')">&times;</a></span>
+  {% endfor %}
+</div>
+
+{% if not teams_compare %}
+<div class="empty-state" style="padding:16px 0;">No teams added yet &mdash; search above to add one.</div>
+{% endif %}
+
+{{ compare_table("Team Record", teams_compare, "name", team_record_rows) }}
+{{ compare_table("Team Batting", teams_compare, "name", team_batting_rows) }}
+{{ compare_table("Team Pitching", teams_compare, "name", team_pitching_rows) }}
+
+<div class="section-title" style="margin-top:40px; font-size:17px;">Broadcast Key Notes (PDF)</div>
+<div class="section-sub">Pick two teams for a 1-2 page highlight sheet &mdash; records, streaks, head-to-head, players to watch</div>
+<form id="broadcast-notes-form" action="{{ url_for('export_broadcast_notes') }}" method="get" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px;">
+  <select name="teamA" id="teamA-select" required style="font-family:'JetBrains Mono',monospace; font-weight:500; background:rgba(0,0,0,0.04); border:1px solid var(--paper-line); color:var(--ink); padding:8px 10px; font-size:13px;">
+    <option value="">Team A&hellip;</option>
+    {% for t in team_search_list %}
+    <option value="{{ t }}">{{ t }}</option>
+    {% endfor %}
+  </select>
+  <select name="pitcherA" id="pitcherA-select" disabled style="font-family:'JetBrains Mono',monospace; font-weight:500; background:rgba(0,0,0,0.04); border:1px solid var(--paper-line); color:var(--ink); padding:8px 10px; font-size:13px; min-width:170px;">
+    <option value="">Auto (Team A ERA leader)</option>
+  </select>
+  <select name="teamB" id="teamB-select" required style="font-family:'JetBrains Mono',monospace; font-weight:500; background:rgba(0,0,0,0.04); border:1px solid var(--paper-line); color:var(--ink); padding:8px 10px; font-size:13px;">
+    <option value="">Team B&hellip;</option>
+    {% for t in team_search_list %}
+    <option value="{{ t }}">{{ t }}</option>
+    {% endfor %}
+  </select>
+  <select name="pitcherB" id="pitcherB-select" disabled style="font-family:'JetBrains Mono',monospace; font-weight:500; background:rgba(0,0,0,0.04); border:1px solid var(--paper-line); color:var(--ink); padding:8px 10px; font-size:13px; min-width:170px;">
+    <option value="">Auto (Team B ERA leader)</option>
+  </select>
+  <button type="submit" class="insert-btn" style="padding:8px 16px; font-size:13px;">Download PDF</button>
+</form>
+<div class="note" style="margin-top:14px;">
+  Starting pitcher dropdowns are scoped to that team's <b>active roster</b> (whoever was actually
+  rostered for their most recent game, not just anyone with a stat line from earlier this season) --
+  they populate once you pick a team. Leave a pitcher on "Auto" to fall back to that team's season ERA
+  leader instead, same as before.
+</div>
+<script>
+(function () {
+  async function loadPitchers(teamName, pitcherSelectEl, fallbackLabel) {
+    pitcherSelectEl.disabled = true;
+    pitcherSelectEl.innerHTML = `<option value="">${fallbackLabel}</option>`;
+    if (!teamName) return;
+    pitcherSelectEl.innerHTML = `<option value="">Loading roster&hellip;</option>`;
+    try {
+      const resp = await fetch(`/api/team/${encodeURIComponent(teamName)}/active-pitchers`);
+      const data = await resp.json();
+      const pitchers = data.pitchers || [];
+      let opts = `<option value="">${fallbackLabel}</option>`;
+      opts += pitchers.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+      if (!pitchers.length) opts += `<option value="" disabled>No pitchers found on active roster</option>`;
+      pitcherSelectEl.innerHTML = opts;
+    } catch (e) {
+      pitcherSelectEl.innerHTML = `<option value="">${fallbackLabel}</option>`;
+    }
+    pitcherSelectEl.disabled = false;
+  }
+
+  const teamASelect = document.getElementById('teamA-select');
+  const teamBSelect = document.getElementById('teamB-select');
+  const pitcherASelect = document.getElementById('pitcherA-select');
+  const pitcherBSelect = document.getElementById('pitcherB-select');
+
+  teamASelect.addEventListener('change', () => loadPitchers(teamASelect.value, pitcherASelect, 'Auto (Team A ERA leader)'));
+  teamBSelect.addEventListener('change', () => loadPitchers(teamBSelect.value, pitcherBSelect, 'Auto (Team B ERA leader)'));
+})();
+</script>
+<div class="note" style="margin-top:14px;">
+  Generating this can take a few seconds &mdash; it walks each team's full schedule for streaks/records
+  and pulls a fresh look at league leaders. See <span class="mono">broadcast_notes.py</span> for exactly
+  what's included and how "Players to Watch" gets picked (rule-based: top OPS/ERA above a minimum sample
+  size, not a subjective call).
+</div>
+
+<div class="note">
+  Every number here is the same stat already shown on that player's or team's own page &mdash; this
+  view just lines them up side by side. See <span class="mono">compare_stats.py</span> for the exact
+  row list and which direction ("higher"/"lower") counts as best for highlighting.
+</div>
+
+<script>
+const ALL_PLAYERS = {{ player_search_list|tojson }};
+const ALL_TEAMS = {{ team_search_list|tojson }};
+
+function currentParam(name) {
+  const params = new URLSearchParams(window.location.search);
+  return (params.get(name) || '').split(',').filter(Boolean);
+}
+function setParamAndReload(name, values) {
+  const params = new URLSearchParams(window.location.search);
+  if (values.length) { params.set(name, values.join(',')); } else { params.delete(name); }
+  window.location.search = params.toString();
+}
+function addPlayer(id) {
+  const current = currentParam('players');
+  if (!current.includes(id)) current.push(id);
+  setParamAndReload('players', current);
+}
+function removePlayer(id) {
+  setParamAndReload('players', currentParam('players').filter(x => x !== id));
+}
+function addTeam(name) {
+  const current = currentParam('teams');
+  if (!current.includes(name)) current.push(name);
+  setParamAndReload('teams', current);
+}
+function removeTeam(name) {
+  setParamAndReload('teams', currentParam('teams').filter(x => x !== name));
+}
+
+function setupTypeahead(inputEl, listEl, dataArr, getLabel, getSub, onSelect) {
+  inputEl.addEventListener('input', function() {
+    const q = inputEl.value.trim().toLowerCase();
+    listEl.innerHTML = '';
+    if (!q) { listEl.style.display = 'none'; return; }
+    const matches = dataArr.filter(function(item) {
+      return getLabel(item).toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 8);
+    if (!matches.length) { listEl.style.display = 'none'; return; }
+    matches.forEach(function(item) {
+      const row = document.createElement('div');
+      row.className = 'typeahead-item';
+      const sub = getSub(item);
+      row.innerHTML = getLabel(item) + (sub ? ' <span class="ta-sub">' + sub + '</span>' : '');
+      row.onclick = function() { onSelect(item); inputEl.value = ''; listEl.style.display = 'none'; };
+      listEl.appendChild(row);
+    });
+    listEl.style.display = 'block';
+  });
+  document.addEventListener('click', function(e) {
+    if (e.target !== inputEl && !listEl.contains(e.target)) listEl.style.display = 'none';
+  });
+}
+
+setupTypeahead(
+  document.getElementById('player-search'), document.getElementById('player-suggestions'),
+  ALL_PLAYERS,
+  function(p) { return p.name || p.id; },
+  function(p) { return p.team || ''; },
+  function(p) { addPlayer(p.id); }
+);
+
+setupTypeahead(
+  document.getElementById('team-search'), document.getElementById('team-suggestions'),
+  ALL_TEAMS,
+  function(t) { return t; },
+  function() { return ''; },
+  function(t) { addTeam(t); }
+);
+</script>
+{% endblock %}

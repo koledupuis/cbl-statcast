@@ -1,0 +1,691 @@
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --park: linear-gradient(165deg, #F4E7E2 0%, #FBF6F3 100%);
+  --park-line: rgba(0,0,0,0.10);
+  --paper: #FAF5F1;
+  --paper-line: rgba(0,0,0,0.13);
+  --ink: #201513;
+  --ink-soft: #7C645B;
+  --brick: #8B2A24;
+  --gold: #C24A3A;
+  --pool-low: #8B2A24;
+  --pool-mid: #B7A199;
+  --pool-high: #201513;
+}
+
+abbr[title] {
+  text-decoration: none;
+  border-bottom: 1px dotted var(--gold);
+  cursor: help;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(ellipse 1100px 650px at 18% -8%, rgba(139,42,36,0.08) 0%, rgba(250,245,241,0) 55%),
+    radial-gradient(ellipse 900px 600px at 100% 15%, rgba(90,30,26,0.05) 0%, rgba(250,245,241,0) 50%),
+    linear-gradient(180deg, #FEFBF9 0%, #FAF4EF 55%, #F5EDE6 100%);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+}
+
+a { color: inherit; text-decoration: none; }
+
+.mono { font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+
+/* ---------- top bar ---------- */
+.topbar {
+  background: var(--park);
+  color: var(--ink);
+  border-bottom: 4px solid var(--brick);
+}
+.topbar-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 18px 24px 14px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.brand {
+  font-family: 'Anton', sans-serif;
+  font-size: 28px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.brand small {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  letter-spacing: 2px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+.nav {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+.nav a {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding-bottom: 3px;
+  border-bottom: 2px solid transparent;
+  opacity: 0.8;
+}
+.nav a:hover, .nav a.active {
+  opacity: 1;
+  border-bottom-color: var(--gold);
+}
+.searchbox {
+  display: flex;
+}
+.searchbox input {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  background: rgba(0,0,0,0.045);
+  border: 1px solid var(--park-line);
+  color: var(--ink);
+  padding: 6px 10px;
+  font-size: 13px;
+  width: 170px;
+}
+.searchbox button {
+  background: var(--brick);
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.wrap { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+
+/* ---------- section headers ---------- */
+.section-title {
+  font-family: 'Anton', sans-serif;
+  font-size: 22px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin: 34px 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 3px double var(--paper-line);
+  color: var(--ink);
+}
+.section-title:first-child { margin-top: 0; }
+.section-sub {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: -4px 0 14px;
+}
+
+/* ---------- leaderboard tabs / table ---------- */
+.tabs { display: flex; gap: 4px; margin-bottom: 18px; }
+.tabs a {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  background: rgba(0,0,0,0.035);
+  border: 1px solid var(--paper-line);
+  border-bottom: none;
+}
+.tabs a.active { background: rgba(139,42,36,0.14); border-color: var(--brick); font-weight: 800; }
+
+/* ---------- team filter + sortable headers ---------- */
+.team-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.team-filter-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.team-filter select {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  font-size: 13px;
+  background: rgba(0,0,0,0.045);
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
+  padding: 6px 8px;
+}
+a.sort-link {
+  color: inherit;
+  white-space: nowrap;
+}
+a.sort-link:hover { color: var(--gold); }
+a.sort-link.active { color: var(--gold); font-weight: 800; }
+.sort-arrow { font-size: 8px; margin-left: 3px; }
+
+table.stat-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  font-size: 13px;
+  background: rgba(0,0,0,0.02);
+}
+table.stat-table th {
+  text-align: right;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  border-bottom: 2px solid var(--ink);
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+table.stat-table th:first-child, table.stat-table th:nth-child(2) { text-align: left; }
+table.stat-table td {
+  text-align: right;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--paper-line);
+  white-space: nowrap;
+}
+table.stat-table td:first-child, table.stat-table td:nth-child(2) { text-align: left; }
+table.stat-table tr:hover td { background: rgba(0,0,0,0.035); }
+.rank-col { color: var(--ink-soft); width: 28px; }
+.player-link { font-weight: 700; }
+.player-link:hover { color: var(--gold); text-decoration: underline; }
+.team-tag {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+
+/* ---------- player page ---------- */
+.player-header {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  background: var(--park);
+  color: var(--ink);
+  padding: 22px 26px;
+  border-bottom: 4px solid var(--brick);
+  margin: -28px -24px 0;
+}
+.player-photo {
+  width: 96px; height: 96px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: #EEE0DA;
+  border: 2px solid var(--park-line);
+}
+.player-name {
+  font-family: 'Anton', sans-serif;
+  font-size: 34px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+.player-meta {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin-top: 6px;
+  letter-spacing: 0.5px;
+}
+.player-meta b { color: var(--ink); font-weight: 800; }
+
+.stat-line {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+  margin: 26px 0 8px;
+}
+.stat-line .stat {
+  min-width: 70px;
+}
+.stat-line .stat .v {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 26px;
+  font-weight: 700;
+}
+.stat-line .stat .k {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* percentile bars */
+.pct-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 32px;
+  margin-top: 6px;
+}
+@media (max-width: 640px) { .pct-grid { grid-template-columns: 1fr; } }
+.pct-row { display: flex; align-items: center; gap: 12px; }
+.pct-label {
+  width: 130px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.pct-value {
+  width: 54px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 13px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.pct-track {
+  position: relative;
+  flex: 1;
+  height: 10px;
+  background: linear-gradient(90deg, var(--pool-low), var(--pool-mid) 50%, var(--pool-high));
+  opacity: 0.55;
+  border-radius: 2px;
+}
+.pct-marker {
+  position: absolute;
+  top: -4px;
+  width: 3px;
+  height: 18px;
+  background: var(--ink);
+  transform: translateX(-50%);
+}
+.pct-marker::after {
+  content: attr(data-pct);
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+/* momentum meter badge */
+.momentum-badge {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: rgba(139,42,36,0.12);
+  border: 1px solid var(--paper-line);
+  padding: 10px 14px;
+  margin-top: 6px;
+}
+.momentum-label {
+  font-family: 'Anton', sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.3px;
+}
+.momentum-score {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--gold);
+}
+.momentum-detail {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+/* advanced-stats label/value grid */
+.kv-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 32px;
+  margin-top: 6px;
+}
+@media (max-width: 640px) { .kv-grid { grid-template-columns: 1fr; } }
+.kv-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--paper-line);
+}
+.kv-row .k {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.kv-row .v {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* batted ball breakdown bars */
+.bb-bar-row { margin-bottom: 10px; }
+.bb-bar-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-soft);
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+.bb-bar-track {
+  height: 14px;
+  background: rgba(0,0,0,0.04);
+  border: 1px solid var(--paper-line);
+}
+.bb-bar-fill {
+  height: 100%;
+  background: var(--brick);
+}
+.bb-bar-fill.alt { background: var(--ink-soft); }
+.bb-bar-fill.gold { background: var(--gold); }
+
+.splits-table-wrap { overflow-x: auto; }
+
+/* ---------- game log ---------- */
+tr.month-header-row td {
+  background: var(--park);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 6px 10px;
+}
+tr.month-total-row td, tr.season-total-row td {
+  background: rgba(139,42,36,0.12);
+  border-top: 2px solid var(--paper-line);
+  border-bottom: 2px solid var(--paper-line);
+}
+tr.season-total-row td {
+  background: rgba(139,42,36,0.20);
+  border-top: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+}
+
+.note {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  font-style: italic;
+  border-top: 1px dashed var(--paper-line);
+  padding-top: 10px;
+  margin-top: 30px;
+}
+
+.empty-state {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+footer {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  padding: 30px 0 10px;
+  letter-spacing: 0.5px;
+}
+
+/* ---------- compare page ---------- */
+.compare-picker {
+  position: relative;
+  max-width: 420px;
+  margin-bottom: 14px;
+}
+.compare-picker input {
+  width: 100%;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  background: rgba(0,0,0,0.04);
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.typeahead-list {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: #FFFDFB;
+  border: 1px solid var(--paper-line);
+  border-top: none;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.10);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.typeahead-item {
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 1px solid var(--paper-line);
+}
+.typeahead-item:last-child { border-bottom: none; }
+.typeahead-item:hover { background: rgba(139,42,36,0.14); }
+.typeahead-item .ta-sub { color: var(--ink-soft); font-size: 11px; font-weight: 700; text-transform: uppercase; margin-left: 6px; }
+
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(139,42,36,0.13);
+  border: 1px solid var(--brick);
+  padding: 5px 8px 5px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.chip a {
+  color: var(--ink-soft);
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.chip a:hover { color: var(--gold); }
+
+table.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  font-size: 13px;
+  background: rgba(0,0,0,0.02);
+  margin-bottom: 10px;
+}
+table.compare-table th, table.compare-table td {
+  padding: 7px 12px;
+  text-align: center;
+  border-bottom: 1px solid var(--paper-line);
+  white-space: nowrap;
+}
+table.compare-table th {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  border-bottom: 2px solid var(--ink);
+}
+table.compare-table th:first-child, table.compare-table td:first-child {
+  text-align: left;
+  color: var(--ink-soft);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+table.compare-table td.best {
+  color: var(--gold);
+  font-weight: 800;
+}
+.gameday-lookup {
+  display: flex;
+  gap: 8px;
+  max-width: 460px;
+}
+.gameday-lookup input {
+  flex: 1;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  background: rgba(0,0,0,0.04);
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.gameday-lookup button {
+  background: var(--brick);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* ---------- game header ---------- */
+.game-header {
+  background: var(--park);
+  color: var(--ink);
+  padding: 22px 26px;
+  border-bottom: 4px solid var(--brick);
+  margin: -28px -24px 0;
+}
+.game-header-teams {
+  font-family: 'Anton', sans-serif;
+  font-size: 28px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.game-vs {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink-soft);
+  margin: 0 10px;
+  text-transform: lowercase;
+}
+.game-header-meta {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin-top: 8px;
+  letter-spacing: 0.5px;
+}
+.game-status-tag {
+  color: var(--gold);
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+/* ---------- line score ---------- */
+.linescore-wrap { overflow-x: auto; }
+table.linescore th, table.linescore td { text-align: center; min-width: 26px; }
+table.linescore .team-col { text-align: left; min-width: 140px; }
+table.linescore th.team-col { text-align: left; }
+table.linescore .total-col { font-weight: 800; border-left: 2px solid var(--ink); }
+
+/* ---------- play-by-play ---------- */
+.pbp-inning {
+  border: 1px solid var(--paper-line);
+  background: rgba(0,0,0,0.02);
+  margin-bottom: 8px;
+}
+.pbp-inning summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  border-bottom: 1px solid transparent;
+}
+.pbp-inning[open] summary { border-bottom-color: var(--paper-line); }
+.pbp-row {
+  padding: 8px 12px;
+  border-top: 1px dashed var(--paper-line);
+  font-size: 13px;
+}
+.pbp-row:first-of-type { border-top: none; }
+.pbp-error { background: rgba(139,42,36,0.08); }
+.pbp-main { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.pbp-batter { font-weight: 800; }
+.pbp-outcome { color: var(--gold); font-weight: 700; }
+.pbp-vs { color: var(--ink-soft); font-size: 12px; font-weight: 600; }
+.pbp-rbi, .pbp-scored {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 11.5px;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+.pbp-battedball {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin-top: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.pbp-pitches { display: flex; align-items: center; gap: 5px; margin-top: 6px; }
+.pitch-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.pitch-dot.ball { background: var(--ink-soft); }
+.pitch-dot.strike { background: var(--brick); }
+.pitch-dot.foul { background: var(--gold); }
+.pitch-dot.other { background: rgba(0,0,0,0.22); }
+.pbp-pitch-count {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin-left: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+

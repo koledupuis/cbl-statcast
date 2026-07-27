@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}CBL Stats{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div>
+        <div class="brand">CBL Stats<small>Canadian Baseball League &middot; 2026 Summer</small></div>
+      </div>
+      <div class="nav">
+        <a href="{{ url_for('leaderboard_batting') }}" class="{{ 'active' if active == 'batting' }}">Batting</a>
+        <a href="{{ url_for('leaderboard_pitching') }}" class="{{ 'active' if active == 'pitching' }}">Pitching</a>
+        <a href="{{ url_for('leaderboard_fielding') }}" class="{{ 'active' if active == 'fielding' }}">Fielding</a>
+        <a href="{{ url_for('leaderboard_stadiums') }}" class="{{ 'active' if active == 'stadiums' }}">Stadiums</a>
+        <a href="{{ url_for('leaderboard_teams') }}" class="{{ 'active' if active == 'teams' }}">Teams</a>
+        <a href="{{ url_for('compare_page') }}" class="{{ 'active' if active == 'compare' }}">Compare</a>
+      </div>
+      <form class="searchbox" action="{{ url_for('search') }}" method="get">
+        <input type="text" name="q" placeholder="Find a player&hellip;" value="{{ request.args.get('q', '') }}">
+        <button type="submit">Go</button>
+      </form>
+    </div>
+  </div>
+  <div class="wrap">
+    {% block content %}{% endblock %}
+    <footer>Data via cbl.ca public stats API &middot; unofficial fan-built stats site</footer>
+  </div>
+</body>
+</html>

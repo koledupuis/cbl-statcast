@@ -1,0 +1,22 @@
+services:
+  cbl-stats:
+    build: .
+    container_name: cbl-stats
+    restart: unless-stopped
+    ports:
+      # host_port:container_port -- change the left-hand number if 5000
+      # is already used by something else on your Pi.
+      - "5000:5000"
+    environment:
+      - CBL_SEASON=2026 Summer
+      - CBL_SEASON_YEAR=2026
+      - CBL_CACHE_TTL=120
+    volumes:
+      # Named volume so the completed-game disk cache survives
+      # container restarts and rebuilds -- without this, every
+      # redeploy would mean re-fetching every player's full game
+      # log from cbl.ca again (30-40+ requests per player).
+      - cbl_gameday_cache:/app/.cbl_cache/gameday
+
+volumes:
+  cbl_gameday_cache:

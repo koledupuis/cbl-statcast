@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Gameday &middot; CBL Stats{% endblock %}
+{% block content %}
+<div class="section-title">Gameday</div>
+<div class="section-sub">Pitch-by-pitch box score &amp; play-by-play for a single game</div>
+
+<form class="gameday-lookup" action="{{ url_for('gameday_lookup') }}" method="get">
+  <input type="text" name="id" placeholder="e.g. london-at-hamilton-2026-07-19" value="{{ request.args.get('id', '') }}">
+  <button type="submit">View Game</button>
+</form>
+<div class="section-sub" style="margin-top:14px;">
+  Enter the game's public ID from its cbl.ca URL &mdash; usually
+  <span class="mono">away-team-at-home-team-yyyy-mm-dd</span>.
+</div>
+{% endblock %}

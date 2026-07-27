@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}{{ category|capitalize }} Leaders &middot; CBL Stats{% endblock %}
+
+{% macro sort_link(key, label) %}
+{% set next_dir = 'asc' if (active_sort == key and active_dir == 'desc') else 'desc' %}
+<a href="{{ url_for(request.endpoint, team=selected_team, sort=key, dir=next_dir) }}"
+   class="sort-link {{ 'active' if active_sort == key }}">{{ label|abbr }}{% if active_sort == key %}<span class="sort-arrow">{{ '&#9650;'|safe if active_dir == 'asc' else '&#9660;'|safe }}</span>{% endif %}</a>
+{% endmacro %}
+
+{% block content %}
+<div class="section-title">League Leaders</div>
+<div class="section-sub">2026 Summer Season &middot; {{ rows|length }} players</div>
+
+<div class="tabs">
+  <a href="{{ url_for('leaderboard_batting') }}" class="{{ 'active' if active=='batting' }}">Batting</a>
+  <a href="{{ url_for('leaderboard_pitching') }}" class="{{ 'active' if active=='pitching' }}">Pitching</a>
+  <a href="{{ url_for('leaderboard_fielding') }}" class="{{ 'active' if active=='fielding' }}">Fielding</a>
+  <a href="{{ url_for('leaderboard_teams') }}" class="{{ 'active' if active=='teams' }}">Teams</a>
+</div>
+
+<form class="team-filter" method="get" action="{{ url_for(request.endpoint) }}">
+  <label for="team-select" class="team-filter-label">Team</label>
+  <select id="team-select" name="team" onchange="this.form.submit()">
+    <option value="">All Teams</option>
+    {% for t in teams %}
+    <option value="{{ t }}" {{ 'selected' if t == selected_team }}>{{ t }}</option>
+    {% endfor %}
+  </select>
+  {% if active_sort %}<input type="hidden" name="sort" value="{{ active_sort }}">{% endif %}
+  {% if active_dir %}<input type="hidden" name="dir" value="{{ active_dir }}">{% endif %}
+  <noscript><button type="submit">Filter</button></noscript>
+</form>
+
+{% if not rows %}
+  <div class="empty-state">No stats available for this category yet.</div>
+{% elif category == 'batting' %}
+<table class="stat-table">
+  <thead><tr>
+    <th>#</th><th>{{ sort_link('name', 'Player') }}</th><th>{{ sort_link('team', 'Team') }}</th>
+    <th>{{ sort_link('g', 'G') }}</th><th>{{ sort_link('pa', 'PA') }}</th><th>{{ sort_link('ab', 'AB') }}</th>
+    <th>{{ sort_link('r', 'R') }}</th><th>{{ sort_link('h', 'H') }}</th><th>{{ "2B"|abbr }}</th><th>{{ "3B"|abbr }}</th><th>{{ sort_link('hr', 'HR') }}</th>
+    <th>{{ sort_link('rbi', 'RBI') }}</th><th>{{ "BB"|abbr }}</th><th>{{ "SO"|abbr }}</th>
+    <th>{{ sort_link('avg', 'AVG') }}</th><th>{{ sort_link('obp', 'OBP') }}</th>
+    <th>{{ sort_link('slg', 'SLG') }}</th><th>{{ sort_link('ops', 'OPS') }}</th>
+  </tr></thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td class="rank-col">{{ loop.index }}</td>
+      <td><a class="player-link" href="{{ url_for('player_page', player_id=r.playerId) }}">{{ r.fullName }}</a></td>
+      <td class="team-tag"><a href="{{ url_for('team_roster', team_name=r.teamName) }}">{{ r.teamName }}</a></td>
+      <td>{{ r.games }}</td>
+      <td>{{ r.plateAppearances }}</td>
+      <td>{{ r.atBats }}</td>
+      <td>{{ r.runs }}</td>
+      <td>{{ r.hits }}</td>
+      <td>{{ r.doubles }}</td>
+      <td>{{ r.triples }}</td>
+      <td>{{ r.homeRuns }}</td>
+      <td>{{ r.rbi }}</td>
+      <td>{{ r.walks }}</td>
+      <td>{{ r.strikeouts }}</td>
+      <td>{{ r.battingAvg|fmt3 }}</td>
+      <td>{{ r.obp|fmt3 }}</td>
+      <td>{{ r.slg|fmt3 }}</td>
+      <td>{{ r.ops|fmt3 }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% elif category == 'pitching' %}
+<table class="stat-table">
+  <thead><tr>
+    <th>#</th><th>{{ sort_link('name', 'Player') }}</th><th>{{ sort_link('team', 'Team') }}</th>
+    <th>{{ sort_link('g', 'G') }}</th><th>{{ "GS"|abbr }}</th><th>{{ sort_link('w', 'W') }}</th><th>{{ sort_link('l', 'L') }}</th>
+    <th>{{ sort_link('sv', 'SV') }}</th><th>{{ "IP"|abbr }}</th><th>{{ "H"|abbr }}</th>
+    <th>{{ "ER"|abbr }}</th><th>{{ "BB"|abbr }}</th><th>{{ sort_link('so', 'SO') }}</th>
+    <th>{{ sort_link('era', 'ERA') }}</th><th>{{ sort_link('whip', 'WHIP') }}</th>
+  </tr></thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td class="rank-col">{{ loop.index }}</td>
+      <td><a class="player-link" href="{{ url_for('player_page', player_id=r.playerId) }}">{{ r.fullName }}</a></td>
+      <td class="team-tag"><a href="{{ url_for('team_roster', team_name=r.teamName) }}">{{ r.teamName }}</a></td>
+      <td>{{ r.games }}</td>
+      <td>{{ r.gamesStarted }}</td>
+      <td>{{ r.wins }}</td>
+      <td>{{ r.losses }}</td>
+      <td>{{ r.saves }}</td>
+      <td>{{ r.inningsPitched }}</td>
+      <td>{{ r.hitsAllowed }}</td>
+      <td>{{ r.earnedRuns }}</td>
+      <td>{{ r.walksAllowed }}</td>
+      <td>{{ r.strikeoutsPitching }}</td>
+      <td>{{ r.era|fmt2 }}</td>
+      <td>{{ r.whip|fmt2 }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% else %}
+<table class="stat-table">
+  <thead><tr>
+    <th>#</th><th>{{ sort_link('name', 'Player') }}</th><th>{{ sort_link('team', 'Team') }}</th>
+    <th>{{ sort_link('g', 'G') }}</th><th>{{ sort_link('po', 'PO') }}</th><th>{{ sort_link('a', 'A') }}</th>
+    <th>{{ sort_link('e', 'E') }}</th><th>{{ "TC"|abbr }}</th><th>{{ sort_link('fpct', 'FPCT') }}</th>
+  </tr></thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td class="rank-col">{{ loop.index }}</td>
+      <td><a class="player-link" href="{{ url_for('player_page', player_id=r.playerId) }}">{{ r.fullName }}</a></td>
+      <td class="team-tag"><a href="{{ url_for('team_roster', team_name=r.teamName) }}">{{ r.teamName }}</a></td>
+      <td>{{ r.games }}</td>
+      <td>{{ r.putouts }}</td>
+      <td>{{ r.assists }}</td>
+      <td>{{ r.errors }}</td>
+      <td>{{ r.totalChances }}</td>
+      <td>{{ r.fieldingPct|fmt3 }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

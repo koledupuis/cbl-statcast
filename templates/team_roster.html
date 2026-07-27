@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}{{ team_name }} Roster &middot; CBL Stats{% endblock %}
+
+{% block content %}
+<div class="player-header">
+  <div>
+    <div class="player-name">{{ team_name }}</div>
+    <div class="player-meta">
+      {% if team_batting_line %}{{ team_batting_line.players }} hitters{% endif %}
+      {% if team_batting_line and team_pitching_line %} &middot; {% endif %}
+      {% if team_pitching_line %}{{ team_pitching_line.players }} pitchers{% endif %}
+      &middot; <a href="{{ url_for('team_splits', team_name=team_name) }}" style="color:inherit; text-decoration:underline;">View Team Splits</a>
+    </div>
+  </div>
+</div>
+
+{% if team_batting_line or team_pitching_line %}
+<div class="stat-line">
+  {% if team_batting_line %}
+  <div class="stat"><div class="v">{{ team_batting_line.ops|fmt3 }}</div><div class="k">Team OPS</div></div>
+  <div class="stat"><div class="v">{{ team_batting_line.runs_per_game|fmt2 }}</div><div class="k">R/Game</div></div>
+  {% endif %}
+  {% if team_pitching_line %}
+  <div class="stat"><div class="v">{{ team_pitching_line.era|fmt2 }}</div><div class="k">Team ERA</div></div>
+  <div class="stat"><div class="v">{{ team_pitching_line.whip|fmt2 }}</div><div class="k">Team WHIP</div></div>
+  {% endif %}
+</div>
+<div class="section-sub" style="margin-top:-6px;">
+  Full breakdown on the <a href="{{ url_for('leaderboard_teams') }}" style="text-decoration:underline;">Teams</a> page.
+</div>
+{% endif %}
+
+{% if status_breakdown and (status_breakdown|length > 1 or "completed" not in status_breakdown) %}
+<div class="note" style="border: 1px solid var(--brick); padding: 10px 14px; margin: 20px 0 0; font-style: normal;">
+  <b>Heads up:</b> this team's schedule entries use more than one status value:
+  {% for status, count in status_breakdown.items() %}{{ status }} ({{ count }}){{ ", " if not loop.last }}{% endfor %}.
+  Only <span class="mono">completed</span> games are counted toward the record below &mdash; if one of
+  the other statuses here is actually a finished game just spelled differently, that's the missing game.
+</div>
+{% endif %}
+
+{% if team_record and team_record.games %}
+<div class="section-title" style="margin-top:30px;">Team Record</div>
+<div class="stat-line" style="margin-top:0;">
+  <div class="stat"><div class="v">{{ team_record.wins }}-{{ team_record.losses }}</div><div class="k">Record</div></div>
+  <div class="stat"><div class="v">{{ team_record.win_pct|fmt3 }}</div><div class="k">Win %</div></div>
+  <div class="stat"><div class="v">{{ team_record.loss_pct|fmt3 }}</div><div class="k">Loss %</div></div>
+  <div class="stat"><div class="v">{{ team_record.run_differential }}</div><div class="k">{{ 'Run Diff'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ team_record.pythagorean_win_pct|fmt3 }}</div><div class="k">{{ 'Pythag Win %'|abbr }}</div></div>
+  <div class="stat"><div class="v">{{ team_record.expected_wins|fmt1 if team_record.expected_wins is not none else "---" }}</div><div class="k">Expected Wins</div></div>
+  <div class="stat"><div class="v">{{ team_record.expected_losses|fmt1 if team_record.expected_losses is not none else "---" }}</div><div class="k">Expected Losses</div></div>
+  <div class="stat"><div class="v">{{ "%+.1f"|format(team_record.wins_above_expected) if team_record.wins_above_expected is not none else "---" }}</div><div class="k">Wins Above Expected</div></div>
+</div>
+<table class="stat-table" style="margin-top:14px;">
+  <thead><tr><th>Split</th><th>{{ 'G'|abbr }}</th><th>Win %</th><th>Loss %</th></tr></thead>
+  <tbody>
+    <tr><td>One-Run Games</td><td>{{ team_record.one_run_games }}</td><td>{{ team_record.one_run_win_pct|fmt3 if team_record.one_run_win_pct is not none else "---" }}</td><td>{{ team_record.one_run_loss_pct|fmt3 if team_record.one_run_loss_pct is not none else "---" }}</td></tr>
+    <tr><td>When Scoring First</td><td>{{ team_record.scored_first_games }}</td><td>{{ team_record.scored_first_win_pct|fmt3 if team_record.scored_first_win_pct is not none else "---" }}</td><td>{{ team_record.scored_first_loss_pct|fmt3 if team_record.scored_first_loss_pct is not none else "---" }}</td></tr>
+    <tr><td>When Allowing First Run</td><td>{{ team_record.allowed_first_games }}</td><td>{{ team_record.allowed_first_win_pct|fmt3 if team_record.allowed_first_win_pct is not none else "---" }}</td><td>{{ team_record.allowed_first_loss_pct|fmt3 if team_record.allowed_first_loss_pct is not none else "---" }}</td></tr>
+    <tr><td>Leading After 5 Innings</td><td>{{ team_record.lead_after_5_games }}</td><td>{{ team_record.lead_after_5_win_pct|fmt3 if team_record.lead_after_5_win_pct is not none else "---" }}</td><td>{{ team_record.lead_after_5_loss_pct|fmt3 if team_record.lead_after_5_loss_pct is not none else "---" }}</td></tr>
+    <tr><td>Leading After 7 Innings</td><td>{{ team_record.lead_after_7_games }}</td><td>{{ team_record.lead_after_7_win_pct|fmt3 if team_record.lead_after_7_win_pct is not none else "---" }}</td><td>{{ team_record.lead_after_7_loss_pct|fmt3 if team_record.lead_after_7_loss_pct is not none else "---" }}</td></tr>
+  </tbody>
+</table>
+<div class="note">
+  Pythagorean Win % uses exponent 1.83 (a common refinement of the original Bill James formula), not a
+  value derived from this league specifically. Expected Wins is Pythagorean Win % &times; games played;
+  Wins Above Expected is actual wins minus that &mdash; positive means the team has won more than their
+  runs scored/allowed would predict (often a sign of strong performance in close games), negative means
+  fewer. Every split above is read directly from each completed game's inning-by-inning line score. See
+  <span class="mono">team_schedule.py</span>.
+</div>
+
+{% if team_record.diagnostics and (team_record.diagnostics.skipped_no_public_id or team_record.diagnostics.skipped_fetch_failed or team_record.diagnostics.skipped_tie) %}
+<div class="note" style="border: 1px solid var(--brick); padding: 10px 14px; margin-top:14px; font-style: normal;">
+  <b>Heads up:</b> the schedule feed had {{ team_record.diagnostics.schedule_entries_found }} game{{ 's' if team_record.diagnostics.schedule_entries_found != 1 }}
+  listed for this team, but only {{ team_record.games }} were actually scored into the record above.
+  {% if team_record.diagnostics.skipped_fetch_failed %}{{ team_record.diagnostics.skipped_fetch_failed }} couldn't be fetched/read.{% endif %}
+  {% if team_record.diagnostics.skipped_no_public_id %}{{ team_record.diagnostics.skipped_no_public_id }} had no game ID to look up.{% endif %}
+  {% if team_record.diagnostics.skipped_tie %}{{ team_record.diagnostics.skipped_tie }} came back tied (not counted as a win or loss).{% endif %}
+  If the record still looks wrong after checking the games list below, one of these skipped entries is
+  probably why &mdash; that's usually a schedule-matching mismatch for that one specific game (see
+  <span class="mono">gamelog.team_games()</span>'s docstring for the kinds of mismatches already handled).
+</div>
+{% endif %}
+
+{% if team_record.game_results %}
+<details class="pbp-inning" style="margin-top:14px;">
+  <summary>Games counted toward this record ({{ team_record.game_results|length }})</summary>
+  <div class="splits-table-wrap">
+  <table class="stat-table" style="margin-top:0;">
+    <thead><tr><th>Date</th><th>Opp</th><th>Score</th><th>Result</th></tr></thead>
+    <tbody>
+      {% for g in team_record.game_results %}
+      <tr>
+        <td class="mono">{% if g.public_game_id %}<a href="{{ url_for('game_page', public_game_id=g.public_game_id) }}">{{ g.date }}</a>{% else %}{{ g.date }}{% endif %}</td>
+        <td class="team-tag">{{ 'vs' if g.is_home else '@' }} {{ g.opponent }}</td>
+        <td>{{ g.team_runs }}-{{ g.opp_runs }}</td>
+        <td>{{ g.result }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</details>
+{% endif %}
+{% endif %}
+
+<div class="section-title" style="margin-top:30px;">Batting</div>
+{% if not batting_rows %}
+<div class="empty-state">No batters on this roster yet.</div>
+{% else %}
+<table class="stat-table">
+  <thead><tr>
+    <th>Player</th><th>Pos</th><th>{{ 'G'|abbr }}</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'H'|abbr }}</th>
+    <th>{{ '2B'|abbr }}</th><th>{{ '3B'|abbr }}</th><th>{{ 'HR'|abbr }}</th><th>{{ 'RBI'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th>
+    <th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
+  </tr></thead>
+  <tbody>
+    {% for r in batting_rows %}
+    <tr>
+      <td><a class="player-link" href="{{ url_for('player_page', player_id=r.playerId) }}">{{ r.fullName }}</a></td>
+      <td class="team-tag">{{ r.position }}</td>
+      <td>{{ r.games }}</td><td>{{ r.plateAppearances }}</td><td>{{ r.atBats }}</td>
+      <td>{{ r.runs }}</td><td>{{ r.hits }}</td><td>{{ r.doubles }}</td><td>{{ r.triples }}</td>
+      <td>{{ r.homeRuns }}</td><td>{{ r.rbi }}</td><td>{{ r.walks }}</td><td>{{ r.strikeouts }}</td>
+      <td>{{ r.battingAvg|fmt3 }}</td><td>{{ r.obp|fmt3 }}</td><td>{{ r.slg|fmt3 }}</td><td>{{ r.ops|fmt3 }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<div class="section-title" style="margin-top:30px;">Pitching</div>
+{% if not pitching_rows %}
+<div class="empty-state">No pitchers on this roster yet.</div>
+{% else %}
+<table class="stat-table">
+  <thead><tr>
+    <th>Player</th><th>{{ 'G'|abbr }}</th><th>{{ 'GS'|abbr }}</th><th>{{ 'W'|abbr }}</th><th>{{ 'L'|abbr }}</th><th>{{ 'SV'|abbr }}</th><th>{{ 'IP'|abbr }}</th>
+    <th>{{ 'H'|abbr }}</th><th>{{ 'ER'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'ERA'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th>
+  </tr></thead>
+  <tbody>
+    {% for r in pitching_rows %}
+    <tr>
+      <td><a class="player-link" href="{{ url_for('player_page', player_id=r.playerId) }}">{{ r.fullName }}</a></td>
+      <td>{{ r.games }}</td><td>{{ r.gamesStarted }}</td><td>{{ r.wins }}</td><td>{{ r.losses }}</td>
+      <td>{{ r.saves }}</td><td>{{ r.inningsPitched }}</td><td>{{ r.hitsAllowed }}</td>
+      <td>{{ r.earnedRuns }}</td><td>{{ r.walksAllowed }}</td><td>{{ r.strikeoutsPitching }}</td>
+      <td>{{ r.era|fmt2 }}</td><td>{{ r.whip|fmt2 }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<div class="section-title" style="margin-top:30px;">Fielding</div>
+{% if not fielding_rows %}
+<div class="empty-state">No fielding stats on this roster yet.</div>
+{% else %}
+<table class="stat-table">
+  <thead><tr>
+    <th>Player</th><th>Pos</th><th>{{ 'G'|abbr }}</th><th>{{ 'PO'|abbr }}</th><th>{{ 'A'|abbr }}</th><th>{{ 'E'|abbr }}</th><th>{{ 'TC'|abbr }}</th><th>{{ 'FPCT'|abbr }}</th>
+  </tr></thead>
+  <tbody>
+    {% for r in fielding_rows %}
+    <tr>
+      <td><a class="player-link" href="{{ url_for('player_page', player_id=r.playerId) }}">{{ r.fullName }}</a></td>
+      <td class="team-tag">{{ r.position }}</td>
+      <td>{{ r.games }}</td><td>{{ r.putouts }}</td><td>{{ r.assists }}</td>
+      <td>{{ r.errors }}</td><td>{{ r.totalChances }}</td><td>{{ r.fieldingPct|fmt3 }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

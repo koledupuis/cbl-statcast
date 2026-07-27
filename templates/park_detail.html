@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ detail.venue }} &middot; CBL Stats{% endblock %}
+
+{% block content %}
+<div class="player-header">
+  <div>
+    <div class="player-name">{{ detail.venue }}</div>
+    <div class="player-meta">
+      {{ detail.overall.games }} game{{ 's' if detail.overall.games != 1 }} this season &middot;
+      <a href="{{ url_for('leaderboard_stadiums') }}" style="color:inherit; text-decoration:underline;">Back to Stadiums</a>
+    </div>
+  </div>
+</div>
+
+<div class="stat-line">
+  <div class="stat"><div class="v">{{ detail.overall.games }}</div><div class="k">Games</div></div>
+  <div class="stat"><div class="v">{{ detail.overall.r }}</div><div class="k">Total Runs</div></div>
+  <div class="stat"><div class="v">{{ detail.overall.h }}</div><div class="k">Total Hits</div></div>
+  <div class="stat"><div class="v">{{ detail.overall.hr }}</div><div class="k">Total HR</div></div>
+  <div class="stat"><div class="v">{{ detail.overall.rbi }}</div><div class="k">Total RBI</div></div>
+  <div class="stat"><div class="v">{{ detail.overall.bb }}</div><div class="k">Total BB</div></div>
+  <div class="stat"><div class="v">{{ detail.overall.so }}</div><div class="k">Total SO</div></div>
+</div>
+<div class="section-sub" style="margin-top:-6px;">Season totals at this park, both teams combined.</div>
+
+<div class="stat-line" style="margin-top:14px;">
+  <div class="stat"><div class="v">{{ detail.overall.avg|fmt3 }}</div><div class="k">Park AVG</div></div>
+  <div class="stat"><div class="v">{{ detail.overall.ops|fmt3 }}</div><div class="k">Park OPS</div></div>
+  <div class="stat"><div class="v">{{ detail.overall.runs_per_game|fmt2 if detail.overall.runs_per_game is not none else "---" }}</div><div class="k">Runs / Game</div></div>
+  <div class="stat"><div class="v">{{ detail.pitching.era|fmt2 if detail.pitching.era is not none else "---" }}</div><div class="k">Runs Environment (ERA)</div></div>
+</div>
+<div class="section-sub" style="margin-top:-6px;">Both teams' hitters/pitching combined -- this is about the park itself, not any one team.</div>
+
+<div class="section-title" style="margin-top:26px;">Home / Away Split at This Park</div>
+<div class="section-sub">Does batting with the last at-bat here look any different than batting on the road here?</div>
+<table class="stat-table" style="margin-bottom:8px;">
+  <thead><tr>
+    <th></th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+    <th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th>
+    <th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td><b>Home Team Batting</b></td>
+      <td>{{ detail.home.pa }}</td><td>{{ detail.home.ab }}</td><td>{{ detail.home.h }}</td><td>{{ detail.home.hr }}</td>
+      <td>{{ detail.home.bb }}</td><td>{{ detail.home.so }}</td>
+      <td>{{ detail.home.avg|fmt3 }}</td><td>{{ detail.home.obp|fmt3 }}</td><td>{{ detail.home.slg|fmt3 }}</td><td>{{ detail.home.ops|fmt3 }}</td>
+    </tr>
+    <tr>
+      <td><b>Away Team Batting</b></td>
+      <td>{{ detail.away.pa }}</td><td>{{ detail.away.ab }}</td><td>{{ detail.away.h }}</td><td>{{ detail.away.hr }}</td>
+      <td>{{ detail.away.bb }}</td><td>{{ detail.away.so }}</td>
+      <td>{{ detail.away.avg|fmt3 }}</td><td>{{ detail.away.obp|fmt3 }}</td><td>{{ detail.away.slg|fmt3 }}</td><td>{{ detail.away.ops|fmt3 }}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="section-title" style="margin-top:26px;">Pitching at This Park</div>
+<div class="section-sub">Every defensive half-inning here combined, both teams' pitching staffs</div>
+<table class="stat-table" style="margin-bottom:8px;">
+  <thead><tr>
+    <th>{{ 'IP'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+    <th>{{ 'ERA'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td>{{ detail.pitching.ip }}</td><td>{{ detail.pitching.h }}</td><td>{{ detail.pitching.r }}</td>
+      <td>{{ detail.pitching.bb }}</td><td>{{ detail.pitching.so }}</td><td>{{ detail.pitching.hr }}</td>
+      <td>{{ detail.pitching.era|fmt2 if detail.pitching.era is not none else "---" }}</td>
+      <td>{{ detail.pitching.whip|fmt2 if detail.pitching.whip is not none else "---" }}</td>
+      <td>{{ detail.pitching.avg_against|fmt3 }}</td>
+    </tr>
+  </tbody>
+</table>
+<div class="note">Uses runs-allowed (not earned-only) since this is a whole-park aggregate, not one pitcher's own game-by-game data -- same convention this app uses everywhere else at the team-aggregate level.</div>
+
+{% if detail.top_avg or detail.top_hr %}
+<div class="section-title" style="margin-top:26px;">Top Hitters at This Park</div>
+<div class="section-sub">Min {{ 10 }} PA this season at this specific venue</div>
+<div style="display:flex; gap:24px; flex-wrap:wrap;">
+  {% if detail.top_avg %}
+  <table class="stat-table" style="flex:1; min-width:280px;">
+    <thead><tr><th>By AVG</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'HR'|abbr }}</th></tr></thead>
+    <tbody>
+      {% for p in detail.top_avg %}
+      <tr>
+        <td><a class="player-link" href="{{ url_for('player_page', player_id=p.playerId) }}">{{ p.name }}</a> <span class="team-tag">{{ p.team }}</span></td>
+        <td>{{ p.pa }}</td><td>{{ p.avg|fmt3 }}</td><td>{{ p.hr }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  {% if detail.top_hr %}
+  <table class="stat-table" style="flex:1; min-width:280px;">
+    <thead><tr><th>By HR</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'HR'|abbr }}</th></tr></thead>
+    <tbody>
+      {% for p in detail.top_hr %}
+      <tr>
+        <td><a class="player-link" href="{{ url_for('player_page', player_id=p.playerId) }}">{{ p.name }}</a> <span class="team-tag">{{ p.team }}</span></td>
+        <td>{{ p.pa }}</td><td>{{ p.avg|fmt3 }}</td><td>{{ p.hr }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="section-title" style="margin-top:26px;">Games Played Here This Season</div>
+<table class="stat-table">
+  <thead><tr><th>Date</th><th>Away</th><th></th><th>Home</th></tr></thead>
+  <tbody>
+    {% for g in detail.games %}
+    <tr>
+      <td class="mono">{% if g.public_game_id %}<a href="{{ url_for('game_page', public_game_id=g.public_game_id) }}">{{ g.date }}</a>{% else %}{{ g.date }}{% endif %}</td>
+      <td>{{ g.away_team }} {{ g.away_score }}</td>
+      <td>&ndash;</td>
+      <td>{{ g.home_team }} {{ g.home_score }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

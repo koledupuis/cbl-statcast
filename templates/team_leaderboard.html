@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Team Stats &middot; CBL Stats{% endblock %}
+
+{% macro sort_link(key, label) %}
+{% set next_dir = 'asc' if (active_sort == key and active_dir == 'desc') else 'desc' %}
+<a href="{{ url_for('leaderboard_teams', sort=key, dir=next_dir) }}"
+   class="sort-link {{ 'active' if active_sort == key }}">{{ label|abbr }}{% if active_sort == key %}<span class="sort-arrow">{{ '&#9650;'|safe if active_dir == 'asc' else '&#9660;'|safe }}</span>{% endif %}</a>
+{% endmacro %}
+
+{% macro standings_sort_link(key, label) %}
+{% set next_dir = 'asc' if (active_standings_sort == key and active_standings_dir == 'desc') else 'desc' %}
+<a href="{{ url_for('leaderboard_teams', standings_sort=key, standings_dir=next_dir) }}"
+   class="sort-link {{ 'active' if active_standings_sort == key }}">{{ label|abbr }}{% if active_standings_sort == key %}<span class="sort-arrow">{{ '&#9650;'|safe if active_standings_dir == 'asc' else '&#9660;'|safe }}</span>{% endif %}</a>
+{% endmacro %}
+
+{% block content %}
+<div class="section-title">Team Stats</div>
+<div class="section-sub">2026 Summer Season &middot; aggregated from every player's counting stats</div>
+
+<div class="tabs">
+  <a href="{{ url_for('leaderboard_batting') }}">Batting</a>
+  <a href="{{ url_for('leaderboard_pitching') }}">Pitching</a>
+  <a href="{{ url_for('leaderboard_fielding') }}">Fielding</a>
+  <a href="{{ url_for('leaderboard_teams') }}" class="active">Teams</a>
+</div>
+
+<div class="section-title" style="margin-top:26px;">Standings</div>
+<div class="section-sub">Sorted by win % &middot; click any team for their full game-by-game record</div>
+{% if not standings %}
+<div class="empty-state">No completed games found yet.</div>
+{% else %}
+<table class="stat-table">
+  <thead><tr>
+    <th>#</th><th>{{ standings_sort_link('team', 'Team') }}</th><th>W</th><th>L</th>
+    <th>{{ standings_sort_link('win_pct', 'Win %') }}</th>
+    <th>{{ standings_sort_link('games_behind', 'GB') }}</th>
+    <th>{{ standings_sort_link('run_differential', 'Run Diff') }}</th>
+    <th>Pythag Win %</th>
+  </tr></thead>
+  <tbody>
+    {% for t in standings %}
+    <tr>
+      <td class="rank-col">{{ loop.index }}</td>
+      <td><a class="player-link" href="{{ url_for('team_roster', team_name=t.team) }}"><b>{{ t.team }}</b></a></td>
+      <td>{{ t.wins }}</td>
+      <td>{{ t.losses }}</td>
+      <td>{{ t.win_pct|fmt3 if t.win_pct is not none else "---" }}</td>
+      <td>{{ t.games_behind|fmt1 if t.games_behind is not none else "---" }}</td>
+      <td>{{ "%+d"|format(t.run_differential) }}</td>
+      <td>{{ t.pythagorean_win_pct|fmt3 if t.pythagorean_win_pct is not none else "---" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="note">
+  Built by walking every completed game on each team's schedule and reading the final score off the
+  play-by-play &mdash; not pulled from a separate standings endpoint. If a team's record looks off,
+  open their roster page: it lists every game this app actually counted (date, opponent, score, result),
+  so a missing or extra game shows up immediately instead of needing to be tracked down blind. Recomputed
+  at most once every 5 minutes across the whole league, not on every page load.
+</div>
+{% endif %}
+
+<div class="section-title" style="margin-top:32px;">Team Batting</div>
+<table class="stat-table">
+  <thead><tr>
+    <th>#</th><th>{{ sort_link('team', 'Team') }}</th><th>Players</th><th>{{ "G"|abbr }}</th><th>{{ "PA"|abbr }}</th><th>{{ "R"|abbr }}</th>
+    <th>{{ "AVG"|abbr }}</th><th>{{ sort_link('obp', 'OBP') }}</th><th>{{ sort_link('slg', 'SLG') }}</th>
+    <th>{{ sort_link('ops', 'OPS') }}</th><th>{{ sort_link('iso', 'ISO') }}</th>
+    <th>{{ sort_link('woba', 'wOBA') }}</th><th>{{ sort_link('babip', 'BABIP') }}</th>
+    <th>{{ sort_link('rpg', 'R/G') }}</th>
+  </tr></thead>
+  <tbody>
+    {% for t in team_batting %}
+    <tr>
+      <td class="rank-col">{{ loop.index }}</td>
+      <td><a class="player-link" href="{{ url_for('team_roster', team_name=t.team) }}"><b>{{ t.team }}</b></a></td>
+      <td>{{ t.players }}</td>
+      <td>{{ t.games }}</td>
+      <td>{{ t.pa }}</td>
+      <td>{{ t.runs }}</td>
+      <td>{{ t.avg|fmt3 }}</td>
+      <td>{{ t.obp|fmt3 }}</td>
+      <td>{{ t.slg|fmt3 }}</td>
+      <td>{{ t.ops|fmt3 }}</td>
+      <td>{{ t.iso|fmt3 }}</td>
+      <td>{{ t.woba|fmt3 }}</td>
+      <td>{{ t.babip|fmt3 }}</td>
+      <td>{{ t.runs_per_game|fmt2 }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="14" class="empty-state">No batting stats available yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="section-title" style="margin-top:32px;">Team Pitching</div>
+<table class="stat-table">
+  <thead><tr>
+    <th>#</th><th>{{ sort_link('team', 'Team') }}</th><th>Players</th><th>{{ 'IP'|abbr }}</th>
+    <th>{{ sort_link('era', 'ERA') }}</th><th>{{ sort_link('whip', 'WHIP') }}</th>
+    <th>{{ sort_link('fip', 'FIP') }}</th><th>{{ sort_link('gb_pct', 'GB%') }}</th>
+    <th>{{ "FB%"|abbr }}</th><th>{{ sort_link('rapg', 'RA/G') }}</th>
+  </tr></thead>
+  <tbody>
+    {% for t in team_pitching %}
+    <tr>
+      <td class="rank-col">{{ loop.index }}</td>
+      <td><a class="player-link" href="{{ url_for('team_roster', team_name=t.team) }}"><b>{{ t.team }}</b></a></td>
+      <td>{{ t.players }}</td>
+      <td>{{ t.ip }}</td>
+      <td>{{ t.era|fmt2 }}</td>
+      <td>{{ t.whip|fmt2 }}</td>
+      <td>{{ t.fip|fmt2 }}</td>
+      <td>{{ t.gb_pct|fmt_pct }}</td>
+      <td>{{ t.fb_pct|fmt_pct }}</td>
+      <td>{{ t.runs_allowed_per_game|fmt2 }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="10" class="empty-state">No pitching stats available yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="note">
+  Team lines are built by summing every rostered player's season counting stats for that team and
+  re-deriving rate stats on the totals &mdash; not pulled from a separate team-standings endpoint, so
+  they won't include stats from players who've since left the roster if CBL's own site handles that
+  differently. FIP uses a constant derived from this league's own season averages (so league-average
+  FIP lines up with league-average ERA) rather than an imported MLB constant. See
+  <span class="mono">analytics.py</span> for the full list of formulas and approximations.
+</div>
+{% endblock %}
