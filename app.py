@@ -942,6 +942,44 @@ def player_page(player_id):
     if not base_row:
         abort(404)
 
+    # Real roster status from CBL's own transaction log (see
+    # transactions.py) -- matched by name, same as the team roster
+    # page. Display rules here are deliberately different from that
+    # page's plain status badges: "released" reads as "Free Agent"
+    # (clearer to a visitor than CBL's own internal transaction
+    # wording), and "call_up_list" shows nothing at all -- a call-up
+    # designation doesn't change anything meaningful about how this
+    # page should present the player, so it's not worth a badge.
+    roster_badge = None
+    try:
+        tx_status = transactions.player_status(base_row.get("fullName"))
+    except Exception:
+        tx_status = None
+    if tx_status:
+        status = tx_status["status"]
+        if status == transactions.STATUS_RELEASED:
+            roster_badge = {"text": "Free Agent", "css_class": "released"}
+        elif status == transactions.STATUS_INACTIVE:
+            roster_badge = {"text": "Inactive", "css_class": "inactive"}
+        elif status == transactions.STATUS_INJURED:
+            roster_badge = {"text": "Injured", "css_class": "injured"}
+        elif status == transactions.STATUS_LEFT_LEAGUE:
+            roster_badge = {"text": "Left League", "css_class": "left_league"}
+        # STATUS_ACTIVE and STATUS_CALL_UP_LIST intentionally produce
+        # no badge -- both are normal "on a team" states as far as
+        # this page is concerned.
+
+        # If the player's most recent transaction ties them to a
+        # specific team (a Sign or a Trade acquisition both carry the
+        # destination team on the transaction record itself), put that
+        # team first in the list this page displays -- someone who
+        # was traded mid-season should see their CURRENT team up
+        # front, not whichever team's stat row happened to be fetched
+        # first.
+        current_team = tx_status.get("team")
+        if current_team and current_team in player_team_names:
+            player_team_names = [current_team] + [t for t in player_team_names if t != current_team]
+
     analytics_feed = None
     try:
         analytics_feed = cbl_api.get_player_analytics(player_id)
@@ -1101,6 +1139,7 @@ def player_page(player_id):
         p_rows_by_team=p_rows if len(p_rows) > 1 else None,
         f_rows_by_team=f_rows if len(f_rows) > 1 else None,
         player_team_names=player_team_names,
+        roster_badge=roster_badge,
         batting_pct=batting_pct,
         pitching_pct=pitching_pct,
         batting_adv=batting_adv,

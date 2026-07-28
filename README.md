@@ -1,5 +1,29 @@
 # CBL Stats
 
+## Player page: "Free Agent" for released players, call-up hidden, traded team shown first
+
+Individual player pages now show roster status too (previously only
+the team roster page did), with different display rules than that
+page:
+
+- **Released → "Free Agent"** badge, not CBL's internal "Released"
+  wording -- clearer to a site visitor.
+- **Call-Up List → no badge at all.** A call-up designation doesn't
+  change how this page should present the player, so it's not worth
+  cluttering the header with it.
+- **Traded players show their current team first.** A Sign or Trade
+  acquisition transaction both carry the destination team directly on
+  the transaction record -- if that team is one of the player's own
+  team names, it's moved to the front of the list this page displays,
+  so someone traded mid-season sees their current team up front
+  instead of whichever stat row happened to be fetched first.
+
+Tested all three behaviors directly: a released player shows "Free
+Agent," a call-up player shows no badge at all, and a traded player
+(two team rows on record) correctly shows the acquiring team before
+the original one in the header.
+
+
 ## This session: fielding month/day-night splits, count splits (both sides), roster status labels + filter, by-team splits, collapsible dropdowns
 
 - **Fielding monthly and day/night splits** -- new functions in
