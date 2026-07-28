@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{{ team_name }} Roster &middot; CBL Stats{% endblock %}
 
+{% macro status_badge(status) %}
+{% if status and status != 'active' %}<span class="status-badge status-{{ status }}">{{ status|replace('_', ' ')|title }}</span>{% endif %}
+{% endmacro %}
+
 {% block content %}
 <div class="player-header">
   <div>
@@ -10,6 +14,11 @@
       {% if team_batting_line and team_pitching_line %} &middot; {% endif %}
       {% if team_pitching_line %}{{ team_pitching_line.players }} pitchers{% endif %}
       &middot; <a href="{{ url_for('team_splits', team_name=team_name) }}" style="color:inherit; text-decoration:underline;">View Team Splits</a>
+      &middot; {% if active_only %}
+        <a href="{{ url_for('team_roster', team_name=team_name) }}" style="color:inherit; text-decoration:underline;">Show All Players</a>
+      {% else %}
+        <a href="{{ url_for('team_roster', team_name=team_name, active_only=1) }}" style="color:inherit; text-decoration:underline;">Active Roster Only</a>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -118,7 +127,7 @@
   <tbody>
     {% for r in batting_rows %}
     <tr>
-      <td><a class="player-link" href="{{ url_for('player_page', player_id=r.playerId) }}">{{ r.fullName }}</a></td>
+      <td><a class="player-link" href="{{ url_for('player_page', player_id=r.playerId) }}">{{ r.fullName }}</a>{{ status_badge(r.rosterStatus) }}</td>
       <td class="team-tag">{{ r.position }}</td>
       <td>{{ r.games }}</td><td>{{ r.plateAppearances }}</td><td>{{ r.atBats }}</td>
       <td>{{ r.runs }}</td><td>{{ r.hits }}</td><td>{{ r.doubles }}</td><td>{{ r.triples }}</td>
@@ -142,7 +151,7 @@
   <tbody>
     {% for r in pitching_rows %}
     <tr>
-      <td><a class="player-link" href="{{ url_for('player_page', player_id=r.playerId) }}">{{ r.fullName }}</a></td>
+      <td><a class="player-link" href="{{ url_for('player_page', player_id=r.playerId) }}">{{ r.fullName }}</a>{{ status_badge(r.rosterStatus) }}</td>
       <td>{{ r.games }}</td><td>{{ r.gamesStarted }}</td><td>{{ r.wins }}</td><td>{{ r.losses }}</td>
       <td>{{ r.saves }}</td><td>{{ r.inningsPitched }}</td><td>{{ r.hitsAllowed }}</td>
       <td>{{ r.earnedRuns }}</td><td>{{ r.walksAllowed }}</td><td>{{ r.strikeoutsPitching }}</td>
@@ -164,7 +173,7 @@
   <tbody>
     {% for r in fielding_rows %}
     <tr>
-      <td><a class="player-link" href="{{ url_for('player_page', player_id=r.playerId) }}">{{ r.fullName }}</a></td>
+      <td><a class="player-link" href="{{ url_for('player_page', player_id=r.playerId) }}">{{ r.fullName }}</a>{{ status_badge(r.rosterStatus) }}</td>
       <td class="team-tag">{{ r.position }}</td>
       <td>{{ r.games }}</td><td>{{ r.putouts }}</td><td>{{ r.assists }}</td>
       <td>{{ r.errors }}</td><td>{{ r.totalChances }}</td><td>{{ r.fieldingPct|fmt3 }}</td>

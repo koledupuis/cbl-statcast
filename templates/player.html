@@ -15,51 +15,55 @@
 
 {% macro split_table(title, rows) %}
 {% if rows %}
-<div class="section-title" style="margin-top:26px;">{{ title }}</div>
-<div class="splits-table-wrap">
-<table class="stat-table">
-  <thead><tr>
-    <th>Split</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ '2B'|abbr }}</th><th>{{ '3B'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
-    <th>{{ 'RBI'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'HBP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
-  </tr></thead>
-  <tbody>
-    {% for label, t in rows %}
-    <tr>
-      <td>{{ label }}</td>
-      <td>{{ t.pa }}</td><td>{{ t.ab }}</td><td>{{ t.r }}</td><td>{{ t.h }}</td>
-      <td>{{ t.doubles }}</td><td>{{ t.triples }}</td><td>{{ t.hr }}</td>
-      <td>{{ t.rbi }}</td><td>{{ t.bb }}</td><td>{{ t.so }}</td><td>{{ t.hbp }}</td>
-      <td>{{ t.avg|fmt3 }}</td><td>{{ t.obp|fmt3 }}</td><td>{{ t.slg|fmt3 }}</td><td>{{ t.ops|fmt3 }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-</div>
+<details class="splits-dropdown" style="margin-top:12px;">
+  <summary>{{ title }}</summary>
+  <div class="splits-table-wrap">
+  <table class="stat-table">
+    <thead><tr>
+      <th>Split</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ '2B'|abbr }}</th><th>{{ '3B'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+      <th>{{ 'RBI'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'HBP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
+    </tr></thead>
+    <tbody>
+      {% for label, t in rows %}
+      <tr>
+        <td>{{ label }}</td>
+        <td>{{ t.pa }}</td><td>{{ t.ab }}</td><td>{{ t.r }}</td><td>{{ t.h }}</td>
+        <td>{{ t.doubles }}</td><td>{{ t.triples }}</td><td>{{ t.hr }}</td>
+        <td>{{ t.rbi }}</td><td>{{ t.bb }}</td><td>{{ t.so }}</td><td>{{ t.hbp }}</td>
+        <td>{{ t.avg|fmt3 }}</td><td>{{ t.obp|fmt3 }}</td><td>{{ t.slg|fmt3 }}</td><td>{{ t.ops|fmt3 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</details>
 {% endif %}
 {% endmacro %}
 
 {% macro pitch_split_table(title, rows) %}
 {% if rows %}
-<div class="section-title" style="margin-top:26px;">{{ title }}</div>
-<div class="splits-table-wrap">
-<table class="stat-table">
-  <thead><tr>
-    <th>Split</th><th>{{ 'BF'|abbr }}</th><th>{{ 'IP'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
-    <th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'ERA*'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th>
-  </tr></thead>
-  <tbody>
-    {% for label, t in rows %}
-    <tr>
-      <td>{{ label }}</td>
-      <td>{{ t.bf }}</td><td>{{ t.ip }}</td><td>{{ t.h }}</td><td>{{ t.r }}</td><td>{{ t.hr }}</td>
-      <td>{{ t.bb }}</td><td>{{ t.so }}</td>
-      <td>{{ t.era|fmt2 }}</td><td>{{ t.whip|fmt2 if t.whip is not none else "---" }}</td>
-      <td>{{ t.avg_against|fmt3 }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-</div>
+<details class="splits-dropdown" style="margin-top:12px;">
+  <summary>{{ title }}</summary>
+  <div class="splits-table-wrap">
+  <table class="stat-table">
+    <thead><tr>
+      <th>Split</th><th>{{ 'BF'|abbr }}</th><th>{{ 'IP'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+      <th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'ERA*'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th>
+    </tr></thead>
+    <tbody>
+      {% for label, t in rows %}
+      <tr>
+        <td>{{ label }}</td>
+        <td>{{ t.bf }}</td><td>{{ t.ip }}</td><td>{{ t.h }}</td><td>{{ t.r }}</td><td>{{ t.hr }}</td>
+        <td>{{ t.bb }}</td><td>{{ t.so }}</td>
+        <td>{{ t.era|fmt2 }}</td><td>{{ t.whip|fmt2 if t.whip is not none else "---" }}</td>
+        <td>{{ t.avg_against|fmt3 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</details>
 {% endif %}
 {% endmacro %}
 
@@ -118,6 +122,72 @@
   Every number on this page &mdash; season stats, game log, splits &mdash; is combined across all of them,
   not just whichever team happened to come first in CBL's data. See <span class="mono">player_merge.py</span>.
 </div>
+
+{% if b_rows_by_team %}
+<details class="splits-dropdown" style="margin-bottom:16px;">
+  <summary>Batting &mdash; By Team</summary>
+  <table class="stat-table" style="margin-top:10px;">
+    <thead><tr>
+      <th>Team</th><th>{{ 'G'|abbr }}</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th>
+      <th>{{ 'HR'|abbr }}</th><th>{{ 'RBI'|abbr }}</th>
+      <th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
+    </tr></thead>
+    <tbody>
+      {% for r in b_rows_by_team %}
+      <tr>
+        <td><b>{{ r.teamName }}</b></td>
+        <td>{{ r.games }}</td><td>{{ r.plateAppearances }}</td><td>{{ r.atBats }}</td><td>{{ r.hits }}</td>
+        <td>{{ r.homeRuns }}</td><td>{{ r.rbi }}</td>
+        <td>{{ r.battingAvg|fmt3 }}</td><td>{{ r.obp|fmt3 }}</td><td>{{ r.slg|fmt3 }}</td><td>{{ r.ops|fmt3 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</details>
+{% endif %}
+
+{% if p_rows_by_team %}
+<details class="splits-dropdown" style="margin-bottom:16px;">
+  <summary>Pitching &mdash; By Team</summary>
+  <table class="stat-table" style="margin-top:10px;">
+    <thead><tr>
+      <th>Team</th><th>{{ 'G'|abbr }}</th><th>{{ 'IP'|abbr }}</th><th>{{ 'H'|abbr }}</th>
+      <th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'ERA'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th>
+    </tr></thead>
+    <tbody>
+      {% for r in p_rows_by_team %}
+      <tr>
+        <td><b>{{ r.teamName }}</b></td>
+        <td>{{ r.games }}</td><td>{{ r.inningsPitched }}</td><td>{{ r.hitsAllowed }}</td>
+        <td>{{ r.walksAllowed }}</td><td>{{ r.strikeoutsPitching }}</td>
+        <td>{{ r.era|fmt2 }}</td><td>{{ r.whip|fmt2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</details>
+{% endif %}
+
+{% if f_rows_by_team %}
+<details class="splits-dropdown" style="margin-bottom:16px;">
+  <summary>Fielding &mdash; By Team</summary>
+  <table class="stat-table" style="margin-top:10px;">
+    <thead><tr>
+      <th>Team</th><th>{{ 'G'|abbr }}</th><th>{{ 'PO'|abbr }}</th><th>{{ 'A'|abbr }}</th>
+      <th>{{ 'E'|abbr }}</th><th>{{ 'FPCT'|abbr }}</th>
+    </tr></thead>
+    <tbody>
+      {% for r in f_rows_by_team %}
+      <tr>
+        <td><b>{{ r.teamName }}</b></td>
+        <td>{{ r.games }}</td><td>{{ r.putouts }}</td><td>{{ r.assists }}</td>
+        <td>{{ r.errors }}</td><td>{{ r.fieldingPct|fmt3 if r.fieldingPct is not none else "---" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</details>
+{% endif %}
 {% endif %}
 
 {% if b_row %}
