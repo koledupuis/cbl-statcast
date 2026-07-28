@@ -86,7 +86,7 @@
     <img class="player-photo" src="{{ player.headshotUrl }}" alt="{{ player.fullName }}">
   {% endif %}
   <div>
-    <div class="player-name">{{ player.fullName }}</div>
+    <div class="player-name">{{ player.fullName }}{% if roster_badge %} <span class="status-badge status-{{ roster_badge.css_class }}">{{ roster_badge.text }}</span>{% endif %}</div>
     <div class="player-meta">
       <b>{% for tn in player_team_names %}<a href="{{ url_for('team_roster', team_name=tn) }}" style="color:inherit; text-decoration:underline; text-decoration-color:rgba(237,230,211,0.4);">{{ tn }}</a>{{ ' / ' if not loop.last }}{% endfor %}</b> &middot; {{ player.position }}
       {% if analytics and analytics.player %}
