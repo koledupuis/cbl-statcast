@@ -61,7 +61,46 @@ LATE_CLOSE_MARGIN = 2      # score within this many runs (either direction) at t
 # fairly rare scenario.
 
 QPA_STRIKE_RESULTS = ("called_strike", "swinging_strike")
+
+# Display order for Count Splits -- every legal ball-strike count a
+# plate appearance can end on, in the order broadcasters/scorekeepers
+# conventionally read them (balls first, ascending strikes within each
+# ball count), not whatever order they happen to be first encountered
+# while walking a season.
+_CANONICAL_COUNTS = [
+    "0-0", "0-1", "0-2",
+    "1-0", "1-1", "1-2",
+    "2-0", "2-1", "2-2",
+    "3-0", "3-1", "3-2",
+]
+
 QPA_FOUL_RESULTS = ("foul", "foul_bunt")
+
+
+def _final_count(pitches):
+    """Ball-strike count (e.g. '3-2', '0-2') the batter was actually
+    facing when the plate appearance's LAST pitch was thrown -- i.e.
+    the count the real-world outcome happened on ("struck out on a
+    3-2 pitch" means the count WAS 3-2 before that final pitch
+    arrived). None if there are no recorded pitches for this at-bat
+    at all. Same count-reconstruction rules used elsewhere in this
+    module (a foul doesn't add a 3rd strike once already at 2)."""
+    if not pitches:
+        return None
+    balls = 0
+    strikes = 0
+    for i, p in enumerate(pitches):
+        if i == len(pitches) - 1:
+            return f"{balls}-{strikes}"
+        result = (p.get("result") or "").lower()
+        if result == "ball":
+            balls += 1
+        elif result in QPA_STRIKE_RESULTS:
+            strikes = min(strikes + 1, 2)
+        elif result in QPA_FOUL_RESULTS:
+            if strikes < 2:
+                strikes += 1
+    return f"{balls}-{strikes}"
 
 
 def _reached_two_strikes(pitches):
@@ -349,7 +388,7 @@ def build_player_splits(player_id, team_name, season_year=None):
     rows, ready to render as one stat-table per section:
       "Monthly Splits", "Batting Order Splits", "Baserunner Splits",
       "Outs Splits", "Inning Splits", "Game Type Splits", "Two-Strike Splits",
-      "Late & Close Splits"
+      "Late & Close Splits", "Count Splits"
     Each `totals` dict has the raw counting stats plus avg/obp/slg/ops.
 
     quality_pa -- {"total_pa": int, "quality_pa_count": int, "pct": float|None}.
@@ -376,6 +415,7 @@ def build_player_splits(player_id, team_name, season_year=None):
     risp = _blank()
     two_strikes = _blank()
     late_close = _blank()
+    counts = {}
     outs = OrderedDict((k, _blank()) for k in OUTS_LABELS)
     innings = OrderedDict()
     game_type = OrderedDict([
@@ -460,6 +500,9 @@ def build_player_splits(player_id, team_name, season_year=None):
                     _accumulate(risp, outcome, is_ab, scored, rbi)
                 if _reached_two_strikes(ab.get("pitches")):
                     _accumulate(two_strikes, outcome, is_ab, scored, rbi)
+                final_count = _final_count(ab.get("pitches"))
+                if final_count:
+                    _accumulate(counts.setdefault(final_count, _blank()), outcome, is_ab, scored, rbi)
                 if inning >= LATE_CLOSE_INNING and abs(away_score - home_score) <= LATE_CLOSE_MARGIN:
                     _accumulate(late_close, outcome, is_ab, scored, rbi)
 
@@ -493,6 +536,8 @@ def build_player_splits(player_id, team_name, season_year=None):
     _finalize(risp)
     _finalize(two_strikes)
     _finalize(late_close)
+    for totals in counts.values():
+        _finalize(totals)
     for totals in outs.values():
         _finalize(totals)
     for totals in game_type.values():
@@ -516,6 +561,9 @@ def build_player_splits(player_id, team_name, season_year=None):
         ]),
         ("Two-Strike Splits", [("With 2 Strikes", two_strikes)]),
         ("Late & Close Splits", [("Late & Close", late_close)]),
+        ("Count Splits", [
+            (count, counts[count]) for count in _CANONICAL_COUNTS if count in counts
+        ]),
     ])
     quality_pa = {
         "total_pa": total_pa, "quality_pa_count": quality_pa_count,

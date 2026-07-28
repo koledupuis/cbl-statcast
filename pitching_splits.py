@@ -91,6 +91,42 @@ def _is_night(game_time):
         return None
 
 
+_COUNT_STRIKE_RESULTS = ("called_strike", "swinging_strike")
+_COUNT_FOUL_RESULTS = ("foul", "foul_bunt")
+
+_CANONICAL_COUNTS = [
+    "0-0", "0-1", "0-2",
+    "1-0", "1-1", "1-2",
+    "2-0", "2-1", "2-2",
+    "3-0", "3-1", "3-2",
+]
+
+
+def _final_count(pitches):
+    """Ball-strike count (e.g. '3-2', '0-2') the batter was actually
+    facing when the plate appearance's LAST pitch was thrown -- same
+    logic as splits.py's own _final_count, kept as a local copy here
+    rather than a cross-module import of another module's private
+    helper (matching this app's established pattern elsewhere, e.g.
+    stadiums.py's own local _is_night)."""
+    if not pitches:
+        return None
+    balls = 0
+    strikes = 0
+    for i, p in enumerate(pitches):
+        if i == len(pitches) - 1:
+            return f"{balls}-{strikes}"
+        result = (p.get("result") or "").lower()
+        if result == "ball":
+            balls += 1
+        elif result in _COUNT_STRIKE_RESULTS:
+            strikes = min(strikes + 1, 2)
+        elif result in _COUNT_FOUL_RESULTS:
+            if strikes < 2:
+                strikes += 1
+    return f"{balls}-{strikes}"
+
+
 def _accumulate(totals, ab):
     outcome = ab.get("outcome") or ""
     totals["bf"] += 1
@@ -332,6 +368,7 @@ def build_pitcher_splits(player_id, team_name, season_year=None):
     months = OrderedDict()
     baserunners = OrderedDict((k, _blank()) for k in BASE_STATE_LABELS)
     risp = _blank()
+    counts = {}
     outs = OrderedDict((k, _blank()) for k in OUTS_LABELS)
     innings = OrderedDict()
     game_type = OrderedDict([
@@ -374,6 +411,9 @@ def build_pitcher_splits(player_id, team_name, season_year=None):
                 _accumulate(baserunners[_base_state_key(ab.get("baseRunnersBeforePlay"))], ab)
                 if ab.get("runnersInScoringPosition"):
                     _accumulate(risp, ab)
+                final_count = _final_count(ab.get("pitches"))
+                if final_count:
+                    _accumulate(counts.setdefault(final_count, _blank()), ab)
 
                 _accumulate(outs[min(cur_outs, 2)], ab)
 
@@ -393,6 +433,8 @@ def build_pitcher_splits(player_id, team_name, season_year=None):
     for totals in baserunners.values():
         _finalize(totals)
     _finalize(risp)
+    for totals in counts.values():
+        _finalize(totals)
     for totals in outs.values():
         _finalize(totals)
     for totals in game_type.values():
@@ -411,6 +453,9 @@ def build_pitcher_splits(player_id, team_name, season_year=None):
             ("Away Games", game_type["away"]),
             ("Day Games", game_type["day"]),
             ("Night Games", game_type["night"]),
+        ]),
+        ("Count Splits", [
+            (count, counts[count]) for count in _CANONICAL_COUNTS if count in counts
         ]),
     ])
 

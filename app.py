@@ -27,6 +27,7 @@ import splits as player_splits
 import stats
 import stadiums
 import team_schedule
+import transactions
 
 app = Flask(__name__)
 
@@ -506,6 +507,35 @@ def team_roster(team_name):
     if not batting_rows and not pitching_rows and not fielding_rows:
         abort(404)
 
+    # Real roster status (Active/Inactive/Injured/Released/etc) from
+    # CBL's own transaction log -- see transactions.py. Matched by
+    # name (that feed has no player ID); a name with no matching
+    # transaction is left unlabeled rather than assumed active, since
+    # "no transaction on record" isn't the same claim as "confirmed
+    # active."
+    try:
+        roster_status = transactions.build_roster_status()
+    except Exception:
+        roster_status = {}
+
+    def _attach_status(rows):
+        for r in rows:
+            info = roster_status.get((r.get("fullName") or "").strip().lower())
+            r["rosterStatus"] = info["status"] if info else None
+        return rows
+
+    batting_rows = _attach_status(batting_rows)
+    pitching_rows = _attach_status(pitching_rows)
+    fielding_rows = _attach_status(fielding_rows)
+
+    active_only = request.args.get("active_only") == "1"
+    off_roster = {transactions.STATUS_RELEASED, transactions.STATUS_INACTIVE,
+                  transactions.STATUS_INJURED, transactions.STATUS_TRADED_AWAY, transactions.STATUS_LEFT_LEAGUE}
+    if active_only:
+        batting_rows = [r for r in batting_rows if r["rosterStatus"] not in off_roster]
+        pitching_rows = [r for r in pitching_rows if r["rosterStatus"] not in off_roster]
+        fielding_rows = [r for r in fielding_rows if r["rosterStatus"] not in off_roster]
+
     batting_rows = sorted(batting_rows, key=lambda r: r.get("ops") or 0, reverse=True)
     pitching_rows = sorted(pitching_rows, key=lambda r: (r.get("inningsPitched") in (None, 0), r.get("era") or 999))
     fielding_rows = sorted(fielding_rows, key=lambda r: r.get("fieldingPct") or 0, reverse=True)
@@ -538,6 +568,7 @@ def team_roster(team_name):
         fielding_rows=fielding_rows,
         team_batting_line=team_batting_line,
         team_pitching_line=team_pitching_line,
+        active_only=active_only,
         team_record=team_record,
     )
 
@@ -1066,6 +1097,9 @@ def player_page(player_id):
         b_row=b_row,
         p_row=p_row,
         f_row=f_row,
+        b_rows_by_team=b_rows if len(b_rows) > 1 else None,
+        p_rows_by_team=p_rows if len(p_rows) > 1 else None,
+        f_rows_by_team=f_rows if len(f_rows) > 1 else None,
         player_team_names=player_team_names,
         batting_pct=batting_pct,
         pitching_pct=pitching_pct,

@@ -1,5 +1,39 @@
 # CBL Stats
 
+## This session: fielding month/day-night splits, count splits (both sides), roster status labels + filter, by-team splits, collapsible dropdowns
+
+- **Fielding monthly and day/night splits** -- new functions in
+  `fielding_splits.py`, reusing the same MONTH_NAMES/day-night
+  conventions batting splits already use. Tested against constructed
+  multi-game data.
+- **Count splits (3-2, 1-2, etc.)** -- added to both `splits.py`
+  (batting) and `pitching_splits.py` (pitching), via a `_final_count()`
+  helper that reconstructs the real ball-strike count each plate
+  appearance ended on (including the standard rule that a foul with 2
+  strikes doesn't end the at-bat). Rides the same at-bat walk each
+  module already does for its other situational splits -- no new
+  schedule pass. Tested against 5 constructed pitch sequences plus
+  full integration on both sides, including two separate strikeouts on
+  the identical count correctly accumulating together, and canonical
+  count ordering (0-0 through 3-2) rather than encounter order.
+- **Team roster status labels** -- wired last session's `transactions.py`
+  into `/team/<name>`, tagging each player with their real roster
+  status (Inactive/Injured/Released/Traded/Call-Up) via name match;
+  active players stay unlabeled by design. Plus an `?active_only=1`
+  filter toggle. Tested end-to-end: badge shows correctly, filter
+  correctly hides/shows the right players.
+- **Player page splits by team** -- when a player has rows for more
+  than one team this season, a collapsible "By Team" breakdown now
+  shows each team's line separately, using the already-existing
+  unmerged per-team rows (no new data fetch).
+- **Collapsible dropdowns for situational splits** -- converted the
+  shared `split_table`/`pitch_split_table` macros (used for every
+  Monthly/Baserunner/Outs/Inning/Game Type/Two-Strike/Late & Close/
+  Count Splits section) to native `<details>/<summary>` elements, no
+  JS required. Converting these two macros converts every section that
+  uses them at once, rather than touching each individually.
+
+
 ## Yes -- CBL's real transaction feed now backstops "active roster" status
 
 Confirmed the endpoint you shared is real and live: CBL's own front-

@@ -62,6 +62,90 @@ def _finalize(totals):
     return totals
 
 
+def _is_night(game_time):
+    """Rough day/night cut on the printed gameTime (e.g. '2:00 PM');
+    6pm+ counts as night -- same convention splits.py's own _is_night
+    uses for batting/pitching Game Type Splits, kept as a small local
+    copy here rather than importing another module's private helper."""
+    if not game_time:
+        return None
+    t = game_time.strip().upper()
+    try:
+        hh = int(t.split(":")[0]) % 12
+        if "PM" in t:
+            hh += 12
+        return hh >= 18
+    except (ValueError, IndexError):
+        return None
+
+
+def _walk_fielding(player_id, team_name, season_year, bucket_fn):
+    """Shared walk for the monthly/day-night split builders below --
+    `bucket_fn(g)` returns the bucket LABEL for one scheduled game (a
+    month name, or "Day"/"Night"), or None to skip that game (e.g. an
+    unrecognized game time for the day/night split). Combines every
+    position a player played that game into one row per bucket, since
+    month/day-night splits are about overall fielding workload, not
+    broken out by position the way build_fielding_position_splits is."""
+    buckets = OrderedDict()
+
+    for g in gamelog.team_games(team_name, season_year):
+        label = bucket_fn(g)
+        if label is None:
+            continue
+        public_id = gamelog._field(g, "publicGameId", "public_game_id", "public-game-id")
+        if not public_id:
+            continue
+        try:
+            gd = cbl_api.get_gameday(public_id)
+        except Exception:
+            continue
+        if not gd or not gd.get("snapshot"):
+            continue
+
+        pfs = gameday.get_player_fielding_stats(gd, player_id)
+        if not pfs:
+            continue
+        bucket = buckets.setdefault(label, _blank())
+        for pos, pos_stats in (pfs.get("positionStats") or {}).items():
+            _accumulate(bucket, pos_stats)
+
+    result = []
+    for label, totals in buckets.items():
+        _finalize(totals)
+        totals["label"] = label
+        result.append(totals)
+    return result
+
+
+def build_fielding_monthly_splits(player_id, team_name, season_year=None):
+    """Fielding totals (every position combined) bucketed by month --
+    same MONTH_NAMES/date convention gamelog.py's own batting Monthly
+    Splits uses. Returns a list of totals dicts (each with a "label"
+    key), in the order months are first encountered -- team_games()
+    already walks chronologically, so this comes out in season order
+    for free."""
+    return _walk_fielding(
+        player_id, team_name, season_year,
+        lambda g: gamelog._month_name(gamelog._field(g, "gameDate", "game_date", "game-date", default="")),
+    )
+
+
+def build_fielding_daynight_splits(player_id, team_name, season_year=None):
+    """Fielding totals (every position combined) split by day/night
+    game time. Games with an unrecognized/missing game time are
+    skipped from this split entirely (not lumped into either bucket),
+    same as splits.py's own day/night handling elsewhere."""
+    def _bucket(g):
+        game_time = gamelog._field(g, "gameTime", "game_time", "game-time", default="")
+        is_night = _is_night(game_time)
+        if is_night is None:
+            return None
+        return "Night Games" if is_night else "Day Games"
+
+    return _walk_fielding(player_id, team_name, season_year, _bucket)
+
+
 def build_fielding_position_splits(player_id, team_name, season_year=None):
     """Returns a list of per-position totals dicts (each with a
     "position" key), sorted by games played at that position, most-
