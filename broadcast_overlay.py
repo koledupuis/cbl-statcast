@@ -460,6 +460,15 @@ def build_batter_situational_splits(player_id, team_names):
             # pass over the same games.
             "quality_pa": quality_pa,
             "batted_ball_profile": batted_ball_profile,
+            # Exact-count splits (e.g. "2-0", "0-2") -- same story as
+            # quality_pa/batted_ball_profile above: build_player_splits
+            # already computes a full "Count Splits" section as part of
+            # this same walk, previously left sitting in `sections` and
+            # never pulled out here. Keyed by count string so the live
+            # overlay can look up "whatever count is on right now"
+            # directly, e.g. by_count.get("2-0"), rather than searching
+            # a list every poll.
+            "by_count": {label: totals for label, totals in sections.get("Count Splits", [])},
         }
 
     cache_key = ("batter_situational", tuple(sorted(team_names)), player_id)

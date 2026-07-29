@@ -1,5 +1,37 @@
 # CBL Stats
 
+## Broadcast overlay: bigger fonts, Due Up finally wired up, batter-switch animation, live situational callout
+
+- **Font sizes increased** across the key readability elements --
+  batter name (23px&rarr;28px), stat values, pitcher name/stats, mini-table
+  text -- while keeping the smallest uppercase micro-labels more
+  conservative to avoid wrapping inside the fixed-width containers.
+- **Due Up finally renders.** The backend (`build_due_up`) and the CSS
+  for it have existed since an earlier session, but nothing ever
+  called it -- the `#dueup` div sat empty the whole time. Wrote
+  `renderDueUp()` and wired it into the render cycle. Tested end-to-end:
+  correctly shows the next two batters in the real lineup order,
+  correctly skipping the one currently at bat.
+- **Batter-switch animation** -- a quick slide+fade on `.batter-info`
+  whenever the polled `playerId` actually changes between updates, not
+  on every poll (which would make the card flicker constantly even
+  when the same batter is still up). Guarded against animating on the
+  very first render too.
+- **New: live situational split callout.** When a runner's in scoring
+  position, or the count hits a notable extreme (2-0, 3-0, 3-1, 0-2,
+  1-2), a small animated panel shows the batter's own split for
+  exactly that situation -- "0-2 Count: .150 AVG" or "W/ RISP: .300
+  AVG" -- using count-specific splits that were already being computed
+  by `splits.build_player_splits()` for the main site's Splits tab but
+  never exposed to the broadcast overlay's own situational data before
+  now. Count-specific takes priority over RISP when both apply at
+  once, since a fresh extreme count is the more moment-to-moment thing
+  worth flashing on live TV. Tested the priority logic directly against
+  6 scenarios (RISP only, count only, both at once, neither, a notable
+  count with no real data for it falling back to RISP, and missing
+  situational data entirely) before wiring it in.
+
+
 ## New: Situational Batting leaderboard on the Teams page
 
 Sort every team by how they've hit in a specific base-runner situation
