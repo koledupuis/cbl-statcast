@@ -29,9 +29,9 @@
     font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #C24A3A;
     font-weight: 700; margin-top: 6px; margin-bottom: 2px;
   }
-  table.mini-table { width: 100%; border-collapse: collapse; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+  table.mini-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
   table.mini-table th, table.mini-table td { padding: 2px 5px; text-align: center; white-space: nowrap; }
-  table.mini-table th { color: #C9B6AE; font-weight: 600; font-size: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+  table.mini-table th { color: #C9B6AE; font-weight: 600; font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; }
   table.mini-table td:first-child, table.mini-table th:first-child { text-align: left; font-weight: 700; padding-left: 0; }
   table.mini-table tbody tr:nth-child(odd) { background: rgba(255,255,255,0.035); }
   table.mini-table td.hero { color: #E8B84B; font-weight: 800; }
@@ -53,7 +53,7 @@
     padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.12);
   }
   #scoreboard .team-row:last-of-type { border-bottom: none; }
-  #scoreboard .team-name { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
+  #scoreboard .team-name { font-size: 17px; font-weight: 700; letter-spacing: 0.02em; }
   #scoreboard .team-score { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; color: #C24A3A; }
   #scoreboard .team-score.leading { color: #E8B84B; }
 
@@ -71,7 +71,7 @@
   }
   #scoreboard .out-dot.filled { background: #C24A3A; }
   #scoreboard .count-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-  #scoreboard .count-text { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: #F4E7E2; }
+  #scoreboard .count-text { font-size: 23px; font-weight: 800; font-variant-numeric: tabular-nums; color: #F4E7E2; }
   #scoreboard .count-label { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: #C9B6AE; }
   #scoreboard .bs-dots { display: flex; flex-direction: column; gap: 3px; }
   #scoreboard .bs-dots .dot-line { display: flex; gap: 4px; }
@@ -114,14 +114,14 @@
     width: 52px; height: 52px; border-radius: 5px; object-fit: cover; flex-shrink: 0;
     border: 2px solid #C24A3A; background: rgba(255,255,255,0.06);
   }
-  #pitchingpanel .name { font-size: 16px; font-weight: 800; line-height: 1.2; }
-  #pitchingpanel .meta { font-size: 12px; color: #C9B6AE; }
+  #pitchingpanel .name { font-size: 19px; font-weight: 800; line-height: 1.2; }
+  #pitchingpanel .meta { font-size: 13px; color: #C9B6AE; }
   #pitchingpanel .stat-row { display: flex; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
-  #pitchingpanel .stat .v { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
-  #pitchingpanel .stat .k { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: #C9B6AE; }
+  #pitchingpanel .stat .v { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  #pitchingpanel .stat .k { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #C9B6AE; }
   .today-row {
     margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,0.1);
-    display: flex; justify-content: space-between; font-size: 12px; color: #C9B6AE;
+    display: flex; justify-content: space-between; font-size: 13.5px; color: #C9B6AE;
   }
   .today-row b { color: #F4E7E2; font-variant-numeric: tabular-nums; }
 
@@ -140,12 +140,45 @@
   #battercard .now-batting-label {
     font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #C24A3A; font-weight: 700; margin-bottom: 1px;
   }
-  #battercard .batter-name { font-size: 23px; font-weight: 800; line-height: 1.15; }
-  #battercard .batter-meta { font-size: 12px; color: #C9B6AE; margin-top: 1px; }
+  #battercard .batter-name { font-size: 28px; font-weight: 800; line-height: 1.15; }
+  #battercard .batter-meta { font-size: 13.5px; color: #C9B6AE; margin-top: 1px; }
   #battercard .stat-row { display: flex; gap: 18px; margin-top: 6px; flex-wrap: wrap; }
   #battercard .stat { text-align: left; }
-  #battercard .stat .v { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
-  #battercard .stat .k { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: #C9B6AE; }
+  #battercard .stat .v { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  #battercard .stat .k { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #C9B6AE; }
+
+  /* ---- situational callout: appears only when RISP is live or the
+     count hits a notable value (2-0, 0-2, etc), showing the batter's
+     own split for exactly that situation. Hidden by default, animated
+     in/out via the .show class toggled in JS. ---- */
+  #situational-callout {
+    max-height: 0; opacity: 0; overflow: hidden;
+    transition: max-height 0.35s ease, opacity 0.3s ease, margin-top 0.35s ease;
+    margin-top: 0;
+  }
+  #situational-callout.show {
+    max-height: 60px; opacity: 1; margin-top: 8px;
+  }
+  #situational-callout .box {
+    display: flex; align-items: center; gap: 10px;
+    background: linear-gradient(90deg, rgba(194,74,58,0.22), rgba(194,74,58,0.05));
+    border-left: 3px solid #C24A3A; border-radius: 3px; padding: 6px 12px;
+  }
+  #situational-callout .sit-label {
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 800; color: #E8B84B;
+    flex-shrink: 0;
+  }
+  #situational-callout .sit-stats { display: flex; gap: 14px; }
+  #situational-callout .sit-stats .v { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  #situational-callout .sit-stats .k { font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: #C9B6AE; }
+
+  /* ---- batter-change animation: a quick slide+fade whenever the
+     name in .batter-info actually changes between polls ---- */
+  @keyframes batterSwitch {
+    0% { opacity: 0; transform: translateX(-14px); }
+    100% { opacity: 1; transform: translateX(0); }
+  }
+  #battercard .batter-info.switching { animation: batterSwitch 0.45s ease-out; }
 
   /* ---- pie charts (recent outcomes, contact quality) -- larger, legend beside not below ---- */
   #battercard .charts {
@@ -467,6 +500,56 @@ function splitBarChart(title, rows, key, color, scaleMax) {
   return `<div class="barchart-block"><div class="chart-title">${title}</div>${bars}</div>`;
 }
 
+// Notable counts worth calling out live -- hitter's counts (ahead:
+// more balls than strikes) and pitcher's counts (behind: 2 strikes
+// with 0-1 balls). "2-0" is deliberately in here even though it
+// favors the HITTER, not the pitcher -- broadcasters call out any
+// count this lopsided regardless of which side it favors.
+const NOTABLE_COUNTS = ['3-0', '3-1', '2-0', '0-2', '1-2'];
+
+// Picks ONE situational split to surface right now, or null if
+// nothing notable applies -- checked fresh on every poll against the
+// CURRENT base state and count, not cached from a prior at-bat.
+// Count-specific takes priority over RISP when both are true at once,
+// since a full count or a big 0-2 hole is the more moment-to-moment
+// exciting thing to flash on live TV; RISP is the fallback when the
+// count isn't (yet) at one of the extremes.
+function pickSituationalSplit(state, situational) {
+  if (!situational) return null;
+  const countKey = `${state.balls ?? 0}-${state.strikes ?? 0}`;
+  if (NOTABLE_COUNTS.includes(countKey)) {
+    const split = (situational.by_count || {})[countKey];
+    if (split && split.pa) {
+      return { label: `${countKey} Count`, split };
+    }
+  }
+  const risp = state.bases && (state.bases.second || state.bases.third);
+  if (risp && situational.risp && situational.risp.pa) {
+    return { label: 'W/ RISP', split: situational.risp };
+  }
+  return null;
+}
+
+function situationalCalloutHtml(state, situational) {
+  const picked = pickSituationalSplit(state, situational);
+  if (!picked) {
+    return { html: '', show: false };
+  }
+  const s = picked.split;
+  return {
+    show: true,
+    html: `
+      <div class="box">
+        <div class="sit-label">${picked.label}</div>
+        <div class="sit-stats">
+          <div class="stat"><div class="v">${fmt3(s.avg)}</div><div class="k">AVG</div></div>
+          <div class="stat"><div class="v">${fmt3(s.ops)}</div><div class="k">OPS</div></div>
+          <div class="stat"><div class="v">${s.h ?? 0}-${s.ab ?? 0}</div><div class="k">This Split</div></div>
+        </div>
+      </div>`,
+  };
+}
+
 function renderBatterCard(state) {
   const el = document.getElementById('battercard');
   const b = state.batter;
@@ -602,10 +685,11 @@ function renderBatterCard(state) {
   }
 
   const statAsterisk = b.includes_today ? '*' : '';
+  const callout = situationalCalloutHtml(state, b.situational);
 
   el.innerHTML = `
     ${headshot}
-    <div class="batter-info">
+    <div class="batter-info" id="batter-info-inner" data-player-id="${b.playerId || ''}">
       <div class="now-batting-label">Now Batting</div>
       <div class="batter-name">${b.name || ''}</div>
       <div class="batter-meta">${b.team || ''} &middot; ${b.position || ''}</div>
@@ -617,11 +701,27 @@ function renderBatterCard(state) {
         <div class="stat"><div class="v">${b.hr ?? 0}</div><div class="k">HR${statAsterisk}</div></div>
         <div class="stat"><div class="v">${b.rbi ?? 0}</div><div class="k">RBI${statAsterisk}</div></div>
       </div>
+      <div id="situational-callout" class="${callout.show ? 'show' : ''}">${callout.html}</div>
       ${todayRow}
       ${splitsHtml}
     </div>
     <div class="charts">${recentChart}${qualityChart}${qpaChart}${splitsChart}</div>
   `;
+
+  // Batter-change animation: compare this poll's playerId against the
+  // last one we actually rendered, and only animate on a real switch
+  // -- not on every poll, which would make the card flicker every
+  // couple seconds even when the same batter is still up.
+  const newBatterId = b.playerId || null;
+  if (prevRendered.batterId !== null && prevRendered.batterId !== newBatterId) {
+    const infoEl = document.getElementById('batter-info-inner');
+    if (infoEl) {
+      infoEl.classList.remove('switching');
+      void infoEl.offsetWidth; // force reflow so the animation re-triggers even on rapid switches
+      infoEl.classList.add('switching');
+    }
+  }
+  prevRendered.batterId = newBatterId;
 }
 
 function pitchTypeInfo(result) {
@@ -716,6 +816,31 @@ async function poll() {
   }
 }
 
+function renderDueUp(state) {
+  const el = document.getElementById('dueup');
+  const dueUp = state.due_up || [];
+  if (!dueUp.length) {
+    el.innerHTML = '';
+    return;
+  }
+  const items = dueUp.map((p, i) => {
+    const headshot = p.headshotUrl
+      ? `<img class="headshot-xs" src="${p.headshotUrl}" alt="">`
+      : `<div class="headshot-xs" style="display:flex;align-items:center;justify-content:center;font-size:8px;color:#7C645B;">No Photo</div>`;
+    return `
+      <div class="dueup-item">
+        <div class="on-deck-tag">${i === 0 ? 'On Deck' : (i === 1 ? 'In the Hole' : '')}</div>
+        ${headshot}
+        <div class="name">${p.name || ''}</div>
+        <div class="stat">${fmt3(p.avg)} &middot; ${p.hr ?? 0} HR</div>
+      </div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="label">Due Up</div>
+    <div class="dueup-row">${items}</div>
+  `;
+}
+
 function renderDelayed() {
   if (!stateBuffer.length) return;
   // Find the most recent buffered state that's old enough to match the
@@ -730,6 +855,7 @@ function renderDelayed() {
   renderScoreboard(chosen.state);
   renderPitchingPanel(chosen.state);
   renderBatterCard(chosen.state);
+  renderDueUp(chosen.state);
 }
 
 // ---- delay control: hidden by default (this composites directly into
