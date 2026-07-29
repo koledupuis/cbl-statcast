@@ -96,7 +96,7 @@
   </div>
 </div>
 
-{% if b_row or p_row %}
+{% if b_row or p_row or f_row %}
 <div class="tabs" style="margin-top:18px;">
   <a href="#" class="player-tab-link active" data-tab="overview" onclick="return showPlayerTab('overview', this);">Overview</a>
   {% if b_row or pitcher_game_log %}
@@ -559,35 +559,15 @@
   {% if not game_log or not game_log.months %}
     <div class="empty-state">No completed games found for this player yet.</div>
   {% else %}
-  <table class="stat-table">
+  <table class="stat-table" style="margin-bottom:10px;">
     <thead><tr>
-      <th>Date</th><th>Opp</th>
+      <th></th>
       <th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ '2B'|abbr }}</th><th>{{ '3B'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
       <th>{{ 'RBI'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
     </tr></thead>
     <tbody>
-      {% for month, bucket in game_log.months.items() %}
-      <tr class="month-header-row"><td colspan="16"><b>{{ month }}</b></td></tr>
-      {% for r in bucket.rows %}
-      <tr>
-        <td class="mono">{% if r.public_game_id %}<a href="{{ url_for('game_page', public_game_id=r.public_game_id) }}">{{ r.date }}</a>{% else %}{{ r.date }}{% endif %}</td>
-        <td class="team-tag">{{ 'vs' if r.is_home else '@' }} {{ r.opponent }}</td>
-        <td>{{ r.pa }}</td><td>{{ r.ab }}</td><td>{{ r.r }}</td><td>{{ r.h }}</td>
-        <td>{{ r.doubles }}</td><td>{{ r.triples }}</td><td>{{ r.hr }}</td>
-        <td>{{ r.rbi }}</td><td>{{ r.bb }}</td><td>{{ r.so }}</td>
-        <td>{{ r.avg|fmt3 }}</td><td>{{ r.obp|fmt3 }}</td><td>{{ r.slg|fmt3 }}</td><td>{{ r.ops|fmt3 }}</td>
-      </tr>
-      {% endfor %}
-      <tr class="month-total-row">
-        <td colspan="2"><b>{{ month }} totals</b></td>
-        <td>{{ bucket.totals.pa }}</td><td>{{ bucket.totals.ab }}</td><td>{{ bucket.totals.r }}</td><td>{{ bucket.totals.h }}</td>
-        <td>{{ bucket.totals.doubles }}</td><td>{{ bucket.totals.triples }}</td><td>{{ bucket.totals.hr }}</td>
-        <td>{{ bucket.totals.rbi }}</td><td>{{ bucket.totals.bb }}</td><td>{{ bucket.totals.so }}</td>
-        <td>{{ bucket.totals.avg|fmt3 }}</td><td>{{ bucket.totals.obp|fmt3 }}</td><td>{{ bucket.totals.slg|fmt3 }}</td><td>{{ bucket.totals.ops|fmt3 }}</td>
-      </tr>
-      {% endfor %}
       <tr class="season-total-row">
-        <td colspan="2"><b>Season totals</b></td>
+        <td><b>Season Totals</b></td>
         <td>{{ game_log.season_totals.pa }}</td><td>{{ game_log.season_totals.ab }}</td><td>{{ game_log.season_totals.r }}</td><td>{{ game_log.season_totals.h }}</td>
         <td>{{ game_log.season_totals.doubles }}</td><td>{{ game_log.season_totals.triples }}</td><td>{{ game_log.season_totals.hr }}</td>
         <td>{{ game_log.season_totals.rbi }}</td><td>{{ game_log.season_totals.bb }}</td><td>{{ game_log.season_totals.so }}</td>
@@ -595,6 +575,40 @@
       </tr>
     </tbody>
   </table>
+
+  {% for month, bucket in game_log.months.items() %}
+  <details class="splits-dropdown" style="margin-top:8px;">
+    <summary>{{ month }} &middot; {{ bucket.rows|length }} game{{ 's' if bucket.rows|length != 1 }}</summary>
+    <div class="splits-table-wrap">
+    <table class="stat-table">
+      <thead><tr>
+        <th>Date</th><th>Opp</th>
+        <th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ '2B'|abbr }}</th><th>{{ '3B'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+        <th>{{ 'RBI'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
+      </tr></thead>
+      <tbody>
+        {% for r in bucket.rows %}
+        <tr>
+          <td class="mono">{% if r.public_game_id %}<a href="{{ url_for('game_page', public_game_id=r.public_game_id) }}">{{ r.date }}</a>{% else %}{{ r.date }}{% endif %}</td>
+          <td class="team-tag">{{ 'vs' if r.is_home else '@' }} {{ r.opponent }}</td>
+          <td>{{ r.pa }}</td><td>{{ r.ab }}</td><td>{{ r.r }}</td><td>{{ r.h }}</td>
+          <td>{{ r.doubles }}</td><td>{{ r.triples }}</td><td>{{ r.hr }}</td>
+          <td>{{ r.rbi }}</td><td>{{ r.bb }}</td><td>{{ r.so }}</td>
+          <td>{{ r.avg|fmt3 }}</td><td>{{ r.obp|fmt3 }}</td><td>{{ r.slg|fmt3 }}</td><td>{{ r.ops|fmt3 }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="month-total-row">
+          <td colspan="2"><b>{{ month }} totals</b></td>
+          <td>{{ bucket.totals.pa }}</td><td>{{ bucket.totals.ab }}</td><td>{{ bucket.totals.r }}</td><td>{{ bucket.totals.h }}</td>
+          <td>{{ bucket.totals.doubles }}</td><td>{{ bucket.totals.triples }}</td><td>{{ bucket.totals.hr }}</td>
+          <td>{{ bucket.totals.rbi }}</td><td>{{ bucket.totals.bb }}</td><td>{{ bucket.totals.so }}</td>
+          <td>{{ bucket.totals.avg|fmt3 }}</td><td>{{ bucket.totals.obp|fmt3 }}</td><td>{{ bucket.totals.slg|fmt3 }}</td><td>{{ bucket.totals.ops|fmt3 }}</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </details>
+  {% endfor %}
   {% endif %}
 
   <div class="note">
@@ -666,39 +680,55 @@
   {% if not pitcher_game_log.months %}
     <div class="empty-state">No completed pitching appearances found for this player yet.</div>
   {% else %}
-  <table class="stat-table">
+  <table class="stat-table" style="margin-bottom:10px;">
     <thead><tr>
-      <th>Date</th><th>Opp</th>
+      <th></th>
       <th>{{ 'BF'|abbr }}</th><th>{{ 'IP'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
       <th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'ERA'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th>
     </tr></thead>
     <tbody>
-      {% for month, bucket in pitcher_game_log.months.items() %}
-      <tr class="month-header-row"><td colspan="12"><b>{{ month }}</b></td></tr>
-      {% for r in bucket.rows %}
-      <tr>
-        <td class="mono">{% if r.public_game_id %}<a href="{{ url_for('game_page', public_game_id=r.public_game_id) }}">{{ r.date }}</a>{% else %}{{ r.date }}{% endif %}</td>
-        <td class="team-tag">{{ 'vs' if r.is_home else '@' }} {{ r.opponent }}</td>
-        <td>{{ r.bf }}</td><td>{{ r.ip }}</td><td>{{ r.h }}</td><td>{{ r.r }}</td><td>{{ r.hr }}</td>
-        <td>{{ r.bb }}</td><td>{{ r.so }}</td>
-        <td>{{ r.era|fmt2 }}{{ '*' if not r.era_exact }}</td><td>{{ r.whip|fmt2 if r.whip is not none else "---" }}</td><td>{{ r.avg_against|fmt3 }}</td>
-      </tr>
-      {% endfor %}
-      <tr class="month-total-row">
-        <td colspan="2"><b>{{ month }} totals</b></td>
-        <td>{{ bucket.totals.bf }}</td><td>{{ bucket.totals.ip }}</td><td>{{ bucket.totals.h }}</td><td>{{ bucket.totals.r }}</td><td>{{ bucket.totals.hr }}</td>
-        <td>{{ bucket.totals.bb }}</td><td>{{ bucket.totals.so }}</td>
-        <td>{{ bucket.totals.era|fmt2 }}{{ '*' if not bucket.totals.era_exact }}</td><td>{{ bucket.totals.whip|fmt2 if bucket.totals.whip is not none else "---" }}</td><td>{{ bucket.totals.avg_against|fmt3 }}</td>
-      </tr>
-      {% endfor %}
       <tr class="season-total-row">
-        <td colspan="2"><b>Season totals</b></td>
+        <td><b>Season Totals</b></td>
         <td>{{ pitcher_game_log.season_totals.bf }}</td><td>{{ pitcher_game_log.season_totals.ip }}</td><td>{{ pitcher_game_log.season_totals.h }}</td><td>{{ pitcher_game_log.season_totals.r }}</td><td>{{ pitcher_game_log.season_totals.hr }}</td>
         <td>{{ pitcher_game_log.season_totals.bb }}</td><td>{{ pitcher_game_log.season_totals.so }}</td>
         <td>{{ pitcher_game_log.season_totals.era|fmt2 }}{{ '*' if not pitcher_game_log.season_totals.era_exact }}</td><td>{{ pitcher_game_log.season_totals.whip|fmt2 if pitcher_game_log.season_totals.whip is not none else "---" }}</td><td>{{ pitcher_game_log.season_totals.avg_against|fmt3 }}</td>
       </tr>
     </tbody>
   </table>
+
+  {% for month, bucket in pitcher_game_log.months.items() %}
+  <details class="splits-dropdown" style="margin-top:8px;">
+    <summary>{{ month }} &middot; {{ bucket.rows|length }} appearance{{ 's' if bucket.rows|length != 1 }}</summary>
+    <div class="splits-table-wrap">
+    <table class="stat-table">
+      <thead><tr>
+        <th>Date</th><th>Opp</th>
+        <th>{{ 'BF'|abbr }}</th><th>{{ 'IP'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+        <th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'ERA'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th>
+      </tr></thead>
+      <tbody>
+        {% for r in bucket.rows %}
+        <tr>
+          <td class="mono">{% if r.public_game_id %}<a href="{{ url_for('game_page', public_game_id=r.public_game_id) }}">{{ r.date }}</a>{% else %}{{ r.date }}{% endif %}</td>
+          <td class="team-tag">{{ 'vs' if r.is_home else '@' }} {{ r.opponent }}</td>
+          <td>{{ r.bf }}</td><td>{{ r.ip }}</td><td>{{ r.h }}</td><td>{{ r.r }}</td><td>{{ r.hr }}</td>
+          <td>{{ r.bb }}</td><td>{{ r.so }}</td>
+          <td>{{ r.era|fmt2 }}{{ '*' if not r.era_exact }}</td><td>{{ r.whip|fmt2 if r.whip is not none else "---" }}</td><td>{{ r.avg_against|fmt3 }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="month-total-row">
+          <td colspan="2"><b>{{ month }} totals</b></td>
+          <td>{{ bucket.totals.bf }}</td><td>{{ bucket.totals.ip }}</td><td>{{ bucket.totals.h }}</td><td>{{ bucket.totals.r }}</td><td>{{ bucket.totals.hr }}</td>
+          <td>{{ bucket.totals.bb }}</td><td>{{ bucket.totals.so }}</td>
+          <td>{{ bucket.totals.era|fmt2 }}{{ '*' if not bucket.totals.era_exact }}</td><td>{{ bucket.totals.whip|fmt2 if bucket.totals.whip is not none else "---" }}</td><td>{{ bucket.totals.avg_against|fmt3 }}</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </details>
+  {% endfor %}
+  {% endif %}
+
   <div class="note">
     ERA here uses CBL's own per-game earned-run total for each appearance &mdash; real earned-run ERA, not an
     approximation. A <b>*</b> next to a specific value means CBL's per-game earned-run data wasn't available for
@@ -712,7 +742,6 @@
     not true earned-run ERA &mdash; the feed doesn't separate earned from unearned runs per play, only
     in the season totals. AVG is batting average allowed. Monthly and season totals are season-to-date.
   </div>
-  {% endif %}
 
 </div><!-- /tab-gamelog -->
 {% endif %}
@@ -1041,10 +1070,60 @@
     mid-game is credited at each position separately for that game, not just their starting spot.
   </div>
   {% endif %}
+
+  {% if fielding_monthly_splits %}
+  <details class="splits-dropdown" style="margin-top:16px;">
+    <summary>Fielding &mdash; By Month</summary>
+    <div class="splits-table-wrap">
+    <table class="stat-table">
+      <thead><tr>
+        <th>Month</th><th>{{ 'G'|abbr }}</th><th>{{ 'PO'|abbr }}</th><th>{{ 'A'|abbr }}</th><th>{{ 'E'|abbr }}</th>
+        <th>{{ 'TC'|abbr }}</th><th>{{ 'FPCT'|abbr }}</th><th>{{ 'RF'|abbr }}</th>
+      </tr></thead>
+      <tbody>
+        {% for m in fielding_monthly_splits %}
+        <tr>
+          <td><b>{{ m.label }}</b></td>
+          <td>{{ m.games }}</td><td>{{ m.putouts }}</td><td>{{ m.assists }}</td><td>{{ m.errors }}</td>
+          <td>{{ m.total_chances }}</td>
+          <td>{{ m.fielding_pct|fmt3 if m.fielding_pct is not none else "---" }}</td>
+          <td>{{ m.range_factor|fmt2 if m.range_factor is not none else "---" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
+  {% endif %}
+
+  {% if fielding_daynight_splits %}
+  <details class="splits-dropdown" style="margin-top:12px;">
+    <summary>Fielding &mdash; Day / Night</summary>
+    <div class="splits-table-wrap">
+    <table class="stat-table">
+      <thead><tr>
+        <th>Split</th><th>{{ 'G'|abbr }}</th><th>{{ 'PO'|abbr }}</th><th>{{ 'A'|abbr }}</th><th>{{ 'E'|abbr }}</th>
+        <th>{{ 'TC'|abbr }}</th><th>{{ 'FPCT'|abbr }}</th><th>{{ 'RF'|abbr }}</th>
+      </tr></thead>
+      <tbody>
+        {% for d in fielding_daynight_splits %}
+        <tr>
+          <td><b>{{ d.label }}</b></td>
+          <td>{{ d.games }}</td><td>{{ d.putouts }}</td><td>{{ d.assists }}</td><td>{{ d.errors }}</td>
+          <td>{{ d.total_chances }}</td>
+          <td>{{ d.fielding_pct|fmt3 if d.fielding_pct is not none else "---" }}</td>
+          <td>{{ d.range_factor|fmt2 if d.range_factor is not none else "---" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
+  {% endif %}
 </div><!-- /tab-fielding -->
 {% endif %}
 
-{% if b_row or p_row %}
+{% if b_row or p_row or f_row %}
 <script>
 function showPlayerTab(name, link) {
   ['overview', 'gamelog', 'splits', 'advanced', 'fielding'].forEach(function(tab) {
