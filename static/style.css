@@ -117,6 +117,40 @@ a { color: inherit; text-decoration: none; }
 .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
 
 /* ---------- section headers ---------- */
+.splits-dropdown {
+  border: 1px solid var(--paper-line);
+  border-radius: 4px;
+  background: rgba(0,0,0,0.015);
+}
+.splits-dropdown summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--brick);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.splits-dropdown summary::-webkit-details-marker { display: none; }
+.splits-dropdown summary::after {
+  content: "+";
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--ink-soft);
+  transition: transform 0.15s ease;
+}
+.splits-dropdown[open] summary::after { transform: rotate(45deg); }
+.splits-dropdown summary:hover { background: rgba(0,0,0,0.03); }
+.splits-dropdown > table, .splits-dropdown > div {
+  padding: 0 14px 14px;
+}
+.splits-dropdown[open] {
+  padding-bottom: 4px;
+}
+
 .section-title {
   font-family: 'Anton', sans-serif;
   font-size: 22px;
@@ -222,6 +256,25 @@ table.stat-table tr:hover td { background: rgba(0,0,0,0.035); }
   color: var(--ink-soft);
   text-transform: uppercase;
 }
+
+.status-badge {
+  display: inline-block;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.status-badge.status-inactive { background: rgba(180,140,20,0.15); color: #8a6d10; }
+.status-badge.status-injured { background: rgba(180,40,40,0.15); color: #a02828; }
+.status-badge.status-released { background: rgba(120,120,120,0.15); color: #666; }
+.status-badge.status-traded_away { background: rgba(120,120,120,0.15); color: #666; }
+.status-badge.status-left_league { background: rgba(120,120,120,0.15); color: #666; }
+.status-badge.status-call_up_list { background: rgba(40,120,180,0.15); color: #1e6a9c; }
 
 /* ---------- player page ---------- */
 .player-header {

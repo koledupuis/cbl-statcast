@@ -55,7 +55,7 @@ def _accumulate_batting(totals, ab):
         totals["ab"] += 1
     if outcome in gameday.HIT_OUTCOMES:
         totals["h"] += 1
-        if outcome == "double":
+        if outcome in ("double", "ground_rule_double"):
             totals["doubles"] += 1
         elif outcome == "triple":
             totals["triples"] += 1

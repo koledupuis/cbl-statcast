@@ -29,7 +29,15 @@ payload shape only includes one of the two representations.
 
 Outcome vocabulary observed on `atBats` entries (not guaranteed
 exhaustive -- anything unrecognized just falls through safely):
-  hits:        single, double, triple, home_run, bunt_single
+  hits:        single, double, triple, home_run, bunt_single,
+               ground_rule_double (CONFIRMED against two independent
+               real games -- a user-reported season-AVG mismatch was
+               traced to this exact outcome being silently uncounted
+               as a hit while still correctly counting as an AB,
+               found by comparing this app's own box-score computation
+               against CBL's own official per-game playerBattingStats
+               for every player in real raw game JSON. Both mismatches
+               found this way had this exact same cause.)
                (bunt_single added based on a user report of a bunt hit
                not counting as a hit -- CBL already breaks out
                sacrifice_bunt as its own outcome distinct from a plain
@@ -69,7 +77,7 @@ only if a particular game's payload doesn't have that field.
 """
 from collections import OrderedDict
 
-HIT_OUTCOMES = {"single", "double", "triple", "home_run", "bunt_single"}
+HIT_OUTCOMES = {"single", "double", "triple", "home_run", "bunt_single", "ground_rule_double"}
 STRIKEOUT_OUTCOMES = {"strikeout_looking", "strikeout_swinging", "dropped_third_strike_out"}
 # "intentional_walk" added from numerical reconciliation against CBL's own
 # official season stats page (not yet directly confirmed against a raw
@@ -573,7 +581,7 @@ def build_batting_box(gd, lookup):
             r["hbp"] += 1
         if outcome in HIT_OUTCOMES:
             r["h"] += 1
-            if outcome == "double":
+            if outcome in ("double", "ground_rule_double"):
                 r["doubles"] += 1
             elif outcome == "triple":
                 r["triples"] += 1

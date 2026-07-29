@@ -1,5 +1,41 @@
 # CBL Stats
 
+## Found it: ground_rule_double. Confirmed, not guessed, and verified against a full season.
+
+The remaining hit-count gap that both Puig and Ohta showed (always
+short by a small, consistent number, everything else matching) is
+fully explained and fixed now.
+
+**How it was found:** with 30 of Chatham-Kent's real games as raw
+JSON, I ran this app's own box-score computation against CBL's own
+official per-game `playerBattingStats` for all 845 player-lines at
+once. That flagged exactly two mismatches, in two completely
+different games with two different players -- both with the identical
+shape (AB correct, H short by exactly 1). Pulling the raw at-bat
+record for both showed the same outcome value in each:
+`"ground_rule_double"` -- a real, distinct outcome string CBL uses,
+separate from plain `"double"`, that this app had never recognized as
+a hit at all. It correctly fell through as "not excluded from AB"
+(so AB was always right) but was never counted as a hit or a double,
+which is exactly the gap both players were showing.
+
+**Fix:** `gameday.HIT_OUTCOMES` now includes `ground_rule_double`, and
+every place that separately counts doubles specifically (five
+locations across `gameday.py`, `splits.py`, `stadiums.py`,
+`broadcast_overlay.py`) now treats it as a double, matching how a
+ground-rule double is scored in real baseball.
+
+**Verified, not assumed:** reran the full 30-game, 845-player-line
+comparison after the fix -- zero mismatches anywhere. Ohta's computed
+season line now matches the official page exactly on every field:
+PA=125, AB=103, H=34, BB=16. This closes out the investigation that
+started several sessions ago from a single screenshot comparison --
+what began as "the numbers don't match" traced through several real
+bugs (an incomplete-at-bat filter that was missing everywhere, a PA
+formula that silently dropped HBP/SF, `intentional_walk` never being
+recognized as a walk) down to this last, now-confirmed cause.
+
+
 ## Trying a sacrifice-fly fix -- speculative, not confirmed like the walk fix was
 
 Two players' remaining AVG gaps pointed the same direction: Puig's

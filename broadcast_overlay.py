@@ -725,7 +725,7 @@ def build_recent_pa_breakdown(player_id, team_names, target_pa=50):
             outcome = ab.get("outcome") or ""
             if outcome == "single" or outcome == "bunt_single":
                 counts["single"] += 1
-            elif outcome == "double":
+            elif outcome in ("double", "ground_rule_double"):
                 counts["double"] += 1
             elif outcome == "triple":
                 counts["triple"] += 1

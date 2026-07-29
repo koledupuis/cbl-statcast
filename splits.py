@@ -255,7 +255,7 @@ def _accumulate(totals, outcome, is_ab, scored, rbi):
         totals["r"] += 1
     if outcome in gameday.HIT_OUTCOMES:
         totals["h"] += 1
-        if outcome == "double":
+        if outcome in ("double", "ground_rule_double"):
             totals["doubles"] += 1
         elif outcome == "triple":
             totals["triples"] += 1
@@ -304,7 +304,7 @@ def _accumulate_team(totals, outcome, is_ab, runs, rbi):
     totals["r"] += runs
     if outcome in gameday.HIT_OUTCOMES:
         totals["h"] += 1
-        if outcome == "double":
+        if outcome in ("double", "ground_rule_double"):
             totals["doubles"] += 1
         elif outcome == "triple":
             totals["triples"] += 1
