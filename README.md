@@ -1,5 +1,73 @@
 # CBL Stats
 
+## Obscure Stats: 6 new categories (12 total), 3-column grid layout
+
+**On-base streak added**, as asked -- reuses rolling.py's own
+`on_base_streak` field (hit, walk, or HBP), same pattern as the
+existing hit-streak category. Tested specifically to confirm it
+counts a walk-only streak that the hit-streak category correctly does
+NOT count.
+
+**Five more added:**
+- **Highest BABIP** -- reuses `analytics.batting_advanced`'s own BABIP
+  formula rather than recomputing it.
+- **Best Contact Rate** (1 - K/PA) -- how often a hitter puts the ball
+  in play at all, independent of what happens after.
+- **Most Total Bases** -- credits doubles/triples a HR-only leaderboard
+  would ignore; tested with hand-calculated values to confirm a
+  high-average low-power hitter and a low-average high-power hitter
+  land in the right order.
+- **Highest Walk Rate** (BB/PA) -- distinct framing from the existing
+  BB/K ratio (a rate against total plate appearances, not against
+  strikeouts specifically).
+- **Best GB/FB Ratio** (pitching) -- reuses `analytics.pitching_advanced`'s
+  own `gb_fb_ratio`, the old-school "groundball pitcher" label
+  quantified.
+
+All new season-row-derived categories go through the same
+`_filter_active()` guard as the original six, so free agents/inactive/
+injured players stay excluded everywhere on this page, not just the
+categories that existed before today.
+
+**Layout reformatted to a 3-column grid** (12 categories = 4 clean
+rows of 3), with responsive breakpoints down to 2 columns and then 1
+on narrower screens.
+
+Tested every new stat's underlying arithmetic by hand against
+constructed data before trusting it, then verified all 12 categories
+render correctly together with the new grid CSS.
+
+
+## Active-only by default, call-ups hidden, obscure stats excludes non-active players
+
+- **Team roster page now defaults to active roster only** (was
+  opt-in). `?active_only=0` shows everyone, same toggle link as
+  before with the direction flipped.
+- **Call-ups show no badge on the team roster page**, matching the
+  individual player page's existing behavior -- previously this page
+  showed a "Call Up List" badge while the player page didn't, an
+  inconsistency now fixed. Released players show "Free Agent" here
+  too, for the same reason.
+- **Obscure Stats now excludes free agents/inactive/injured players
+  from every category.** New shared `_filter_active()` in
+  `obscure_stats.py`, applied to all six leaderboards -- these are
+  "current state" stats (an active streak, a season-to-date rate for
+  someone still playing), so someone no longer active doesn't belong
+  even if their raw numbers would otherwise qualify. Tested directly:
+  a released player with a *higher* ISO than anyone else on the roster
+  is correctly excluded from the ISO leaderboard specifically because
+  they're released, not because of their stats. Call-up status is
+  deliberately NOT filtered here -- a call-up is still an active
+  player.
+
+Tested all three end-to-end together against constructed data: the
+released player disappears from the default team roster view but
+reappears with `active_only=0`, the call-up shows no badge while the
+released player shows "Free Agent," and the released player is
+excluded from Obscure Stats despite having better numbers than the
+active player who ranks above them.
+
+
 ## New Obscure Stats page, game logs converted to dropdowns, and a real gap fixed along the way
 
 **New `/leaderboard/obscure` tab.** Six top-5 leaderboards nobody

@@ -542,7 +542,7 @@ def team_roster(team_name):
     pitching_rows = _attach_status(pitching_rows)
     fielding_rows = _attach_status(fielding_rows)
 
-    active_only = request.args.get("active_only") == "1"
+    active_only = request.args.get("active_only", "1") != "0"
     off_roster = {transactions.STATUS_RELEASED, transactions.STATUS_INACTIVE,
                   transactions.STATUS_INJURED, transactions.STATUS_TRADED_AWAY, transactions.STATUS_LEFT_LEAGUE}
     if active_only:
