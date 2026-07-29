@@ -1,5 +1,36 @@
 # CBL Stats
 
+## New: Situational Batting leaderboard on the Teams page
+
+Sort every team by how they've hit in a specific base-runner situation
+-- RISP, Bases Loaded, Runner at 1st, etc. -- one situation at a time,
+selected via tabs, sortable by AVG/OBP/SLG/OPS/HR/RBI same as every
+other leaderboard on the site. Minimum 15 PA in that specific
+situation to qualify, so a team with a tiny bases-loaded sample doesn't
+top the list on noise.
+
+New `splits.build_situational_leaderboard()` walks the full season
+schedule **once** (every game in the league), attributing each at-bat
+to whichever team was actually batting -- not once per team, which
+would process every game's at-bats twice for no reason (a single game
+involves two teams). Same cost-avoidance approach `stadiums.py` already
+uses for its own whole-league walk. Tested directly against
+constructed two-team data: confirmed both teams' situational buckets
+end up correctly separated from a single pass, confirmed the
+minimum-PA qualifier correctly excludes a situation nobody's cleared
+yet (shows an honest empty state rather than nothing).
+
+**Found and cleaned up a genuine duplicate function while building
+this.** `splits.py` had two separate definitions of
+`build_team_situational_batting` -- Python silently uses the second
+one, so the first was dead code, never actually called by anything.
+Not a behavior bug (nothing was ever getting the wrong answer from
+it), but confusing and wasteful to carry around, so removed the dead
+one along with its now-unused private helper. Verified via full site
+regression that this cleanup didn't change any behavior, since it
+only removed code nothing could reach.
+
+
 ## Found it: ground_rule_double. Confirmed, not guessed, and verified against a full season.
 
 The remaining hit-count gap that both Puig and Ohta showed (always

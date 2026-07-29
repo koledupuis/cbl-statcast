@@ -327,11 +327,57 @@ def leaderboard_teams():
     else:
         team_pitching = sorted(team_pitching, key=lambda r: r["era"] or 999, reverse=False)
 
+    # Situational batting leaderboard -- one situation shown/sorted at a
+    # time (RISP by default), rather than one giant table with all 9
+    # situations' worth of columns at once. See splits.build_situational_leaderboard
+    # for the single-pass, whole-league walk this is built from.
+    situation_labels = [
+        ("risp", "Scoring Position (RISP)"), ("loaded", "Bases Loaded"), ("empty", "Bases Empty"),
+        ("1st", "Runner at 1st"), ("2nd", "Runner at 2nd"), ("3rd", "Runner at 3rd"),
+        ("1st_2nd", "Runners at 1st & 2nd"), ("1st_3rd", "Runners at 1st & 3rd"), ("2nd_3rd", "Runners at 2nd & 3rd"),
+    ]
+    situation_key = (request.args.get("situation") or "risp").strip().lower()
+    if situation_key not in dict(situation_labels):
+        situation_key = "risp"
+
+    try:
+        league_situational = player_splits.build_situational_leaderboard()
+    except Exception:
+        league_situational = {}
+
+    situational_rows = []
+    for team_name, buckets in league_situational.items():
+        totals = buckets.get(situation_key)
+        if not totals or totals.get("pa", 0) < player_splits.MIN_PA_FOR_SITUATIONAL_LEADER:
+            continue
+        situational_rows.append({"team": team_name, **totals})
+
+    sit_sort_key = (request.args.get("sit_sort") or "").strip().lower()
+    sit_dir = (request.args.get("sit_dir") or "").strip().lower()
+    sit_fields = {
+        "team": (lambda r: r["team"].lower(), False), "avg": (lambda r: r["avg"] or 0, True),
+        "obp": (lambda r: r["obp"] or 0, True), "slg": (lambda r: r["slg"] or 0, True),
+        "ops": (lambda r: r["ops"] or 0, True), "hr": (lambda r: r["hr"] or 0, True),
+        "rbi": (lambda r: r["rbi"] or 0, True),
+    }
+    if sit_sort_key in sit_fields:
+        key_fn, bigger_is_better = sit_fields[sit_sort_key]
+        reverse = bigger_is_better if sit_dir not in ("asc", "desc") else (sit_dir == "desc")
+        situational_rows = sorted(situational_rows, key=key_fn, reverse=reverse)
+        active_sit_sort, active_sit_dir = sit_sort_key, ("desc" if reverse else "asc")
+    else:
+        situational_rows = sorted(situational_rows, key=lambda r: r["ops"] or 0, reverse=True)
+        active_sit_sort, active_sit_dir = None, None
+
     return render_template("team_leaderboard.html", active="teams",
                             standings=standings,
                             active_standings_sort=active_standings_sort, active_standings_dir=active_standings_dir,
                             team_batting=team_batting, team_pitching=team_pitching,
-                            active_sort=sort_key or None, active_dir=dir_param or None)
+                            active_sort=sort_key or None, active_dir=dir_param or None,
+                            situation_labels=situation_labels, situation_key=situation_key,
+                            situational_rows=situational_rows,
+                            active_sit_sort=active_sit_sort, active_sit_dir=active_sit_dir,
+                            min_pa_situational=player_splits.MIN_PA_FOR_SITUATIONAL_LEADER)
 
 
 def _player_search_index(all_batting, all_pitching, all_fielding):

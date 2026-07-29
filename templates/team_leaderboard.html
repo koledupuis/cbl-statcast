@@ -13,6 +13,12 @@
    class="sort-link {{ 'active' if active_standings_sort == key }}">{{ label|abbr }}{% if active_standings_sort == key %}<span class="sort-arrow">{{ '&#9650;'|safe if active_standings_dir == 'asc' else '&#9660;'|safe }}</span>{% endif %}</a>
 {% endmacro %}
 
+{% macro sit_sort_link(key, label) %}
+{% set next_dir = 'asc' if (active_sit_sort == key and active_sit_dir == 'desc') else 'desc' %}
+<a href="{{ url_for('leaderboard_teams', situation=situation_key, sit_sort=key, sit_dir=next_dir) }}"
+   class="sort-link {{ 'active' if active_sit_sort == key }}">{{ label|abbr }}{% if active_sit_sort == key %}<span class="sort-arrow">{{ '&#9650;'|safe if active_sit_dir == 'asc' else '&#9660;'|safe }}</span>{% endif %}</a>
+{% endmacro %}
+
 {% block content %}
 <div class="section-title">Team Stats</div>
 <div class="section-sub">2026 Summer Season &middot; aggregated from every player's counting stats</div>
@@ -121,6 +127,40 @@
     {% endfor %}
   </tbody>
 </table>
+
+<div class="section-title" style="margin-top:32px;">Situational Batting</div>
+<div class="section-sub">2026 Summer Season &middot; every team's batting line broken out by base-runner state &middot; min {{ min_pa_situational }} PA in that situation to qualify</div>
+
+<div class="tabs" style="margin-bottom:12px;">
+  {% for key, label in situation_labels %}
+  <a href="{{ url_for('leaderboard_teams', situation=key) }}" class="{{ 'active' if situation_key == key }}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+<table class="stat-table">
+  <thead><tr>
+    <th>#</th><th>{{ sit_sort_link('team', 'Team') }}</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th>
+    <th>{{ 'H'|abbr }}</th><th>{{ sit_sort_link('hr', 'HR') }}</th><th>{{ sit_sort_link('rbi', 'RBI') }}</th>
+    <th>{{ sit_sort_link('avg', 'AVG') }}</th><th>{{ sit_sort_link('obp', 'OBP') }}</th>
+    <th>{{ sit_sort_link('slg', 'SLG') }}</th><th>{{ sit_sort_link('ops', 'OPS') }}</th>
+  </tr></thead>
+  <tbody>
+    {% for t in situational_rows %}
+    <tr>
+      <td class="rank-col">{{ loop.index }}</td>
+      <td><a class="player-link" href="{{ url_for('team_roster', team_name=t.team) }}"><b>{{ t.team }}</b></a></td>
+      <td>{{ t.pa }}</td><td>{{ t.ab }}</td><td>{{ t.h }}</td><td>{{ t.hr }}</td><td>{{ t.rbi }}</td>
+      <td>{{ t.avg|fmt3 }}</td><td>{{ t.obp|fmt3 }}</td><td>{{ t.slg|fmt3 }}</td><td>{{ t.ops|fmt3 }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="11" class="empty-state">No team has reached the minimum PA in this situation yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="note">
+  Every plate appearance by every batter on the team counts here, not just a specific player's own at-bats
+  &mdash; this is about how the TEAM as a whole has hit in this specific situation this season.
+</div>
 
 <div class="note">
   Team lines are built by summing every rostered player's season counting stats for that team and

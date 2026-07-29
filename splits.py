@@ -289,97 +289,6 @@ def _finalize(totals):
     return totals
 
 
-def _accumulate_team(totals, outcome, is_ab, runs, rbi):
-    """Same idea as _accumulate, but for a TEAM total rather than one
-    player: "runs" here is the actual count of runs scored on this
-    play (could be more than 1 -- a grand slam scores 4 different
-    players on one play), not a single player's own 0/1 "did I score"
-    boolean. Kept as a separate function rather than changing
-    _accumulate's signature, since _accumulate's boolean is the
-    correct semantic for a single player and every existing caller
-    depends on that."""
-    totals["pa"] += 1
-    if is_ab:
-        totals["ab"] += 1
-    totals["r"] += runs
-    if outcome in gameday.HIT_OUTCOMES:
-        totals["h"] += 1
-        if outcome in ("double", "ground_rule_double"):
-            totals["doubles"] += 1
-        elif outcome == "triple":
-            totals["triples"] += 1
-        elif outcome == "home_run":
-            totals["hr"] += 1
-    elif outcome in gameday.WALK_OUTCOMES:
-        totals["bb"] += 1
-    elif outcome == "hit_by_pitch":
-        totals["hbp"] += 1
-    if outcome in gameday.STRIKEOUT_OUTCOMES:
-        totals["so"] += 1
-    totals["rbi"] += rbi
-
-
-def build_team_situational_batting(team_name, season_year=None):
-    """Team-level version of the Baserunner Splits build_player_splits
-    builds per player -- every plate appearance by ANY of this team's
-    batters, not just one player's own at-bats. Covers both "Team RISP"
-    and "Team w/ Bases Loaded" in one pass: "Bases Loaded" is already
-    one of the 8 base-state buckets, same as it is for a single player.
-
-    Walks the team's schedule ONCE (not once per player, which would
-    refetch the exact same games' gameday JSON once per roster spot for
-    no reason) -- for each game, only counts at-bats from whichever
-    half-inning this specific team actually bats in (bottom if they're
-    home, top if they're away), so the opponent's at-bats in the same
-    game are correctly excluded.
-
-    Returns a flat list of (label, totals) tuples -- the same shape
-    build_player_splits' own baserunner_rows list uses (8 base-state
-    rows, then one final "Scoring Position" row) -- so the page can
-    reuse that exact rendering pattern.
-    """
-    baserunners = OrderedDict((k, _blank()) for k in BASE_STATE_LABELS)
-    risp = _blank()
-
-    for g in gamelog.team_games(team_name, season_year):
-        public_id = gamelog._field(g, "publicGameId", "public_game_id", "public-game-id")
-        if not public_id:
-            continue
-        try:
-            gd = cbl_api.get_gameday(public_id)
-        except Exception:
-            continue
-        if not gd or not gd.get("snapshot"):
-            continue
-
-        home = gamelog._field(g, "homeTeam", "home_team", "home-team")
-        is_home = gamelog.team_matches(home, team_name)
-        team_half = "bottom" if is_home else "top"
-
-        for ab in gameday.get_at_bats(gd):
-            half = ab.get("halfInning") or "top"
-            if half != team_half or not ab.get("isComplete"):
-                continue
-
-            outcome = ab.get("outcome") or ""
-            is_ab = not gameday.is_non_ab_outcome(ab)
-            runs = len(ab.get("runsScored") or [])
-            rbi = ab.get("rbiCount") or 0
-            before = ab.get("baseRunnersBeforePlay")
-
-            state_key = _base_state_key(before)
-            _accumulate_team(baserunners[state_key], outcome, is_ab, runs, rbi)
-            if ab.get("runnersInScoringPosition"):
-                _accumulate_team(risp, outcome, is_ab, runs, rbi)
-
-    for totals in list(baserunners.values()) + [risp]:
-        _finalize(totals)
-
-    baserunner_rows = [(label, baserunners[key]) for key, label in BASE_STATE_LABELS.items()]
-    baserunner_rows.append(("Scoring Position", risp))
-    return baserunner_rows
-
-
 def build_player_splits(player_id, team_name, season_year=None):
     """
     Returns (sections, quality_pa):
@@ -646,3 +555,75 @@ def build_team_situational_batting(team_name, season_year=None):
     rows = [(label, baserunners[key]) for key, label in BASE_STATE_LABELS.items()]
     rows.append(("Scoring Position", risp))
     return rows
+
+
+MIN_PA_FOR_SITUATIONAL_LEADER = 15  # per situation, per team -- guards a team with a tiny RISP sample
+
+
+def build_situational_leaderboard(season_year=None):
+    """League-wide version of build_team_situational_batting -- every
+    team's batting line broken out by base-runner state (Bases Empty,
+    RISP, Bases Loaded, Runner at 1st, etc.), for every team at once.
+
+    Walks the full season schedule ONCE (gamelog._all_games -- every
+    game in the league), not once per team the way calling
+    build_team_situational_batting() in a loop would -- a single game
+    involves two teams, so a per-team walk would process every game's
+    at-bats twice for no reason. Same cost-avoidance reasoning as
+    stadiums.py's own single-pass walk.
+
+    Returns {team_name: {state_key: totals, ..., "risp": totals}} for
+    every team with at least one completed game on record. `totals`
+    dicts use the same shape (and are built with the same _accumulate/
+    _finalize helpers) as every other batting split on this site."""
+    teams = {}  # team_name -> {state_key: totals, "risp": totals}
+
+    def _team_buckets(team_name):
+        return teams.setdefault(team_name, {
+            **{k: _blank() for k in BASE_STATE_LABELS},
+            "risp": _blank(),
+        })
+
+    for g in gamelog._all_games(season_year):
+        if gamelog._field(g, "status", default="") != "completed":
+            continue
+        public_id = gamelog._field(g, "publicGameId", "public_game_id", "public-game-id")
+        if not public_id:
+            continue
+        try:
+            gd = cbl_api.get_gameday(public_id)
+        except Exception:
+            continue
+        if not gd or not gd.get("snapshot"):
+            continue
+
+        home = gamelog._field(g, "homeTeam", "home_team", "home-team")
+        away = gamelog._field(g, "awayTeam", "away_team", "away-team")
+        if not home or not away:
+            continue
+
+        for ab in gameday.get_at_bats(gd):
+            if not ab.get("isComplete"):
+                continue
+            half = ab.get("halfInning") or "top"
+            batting_team = home if half == "bottom" else away
+            buckets = _team_buckets(batting_team)
+
+            outcome = ab.get("outcome") or ""
+            is_ab = not gameday.is_non_ab_outcome(ab)
+            runs_this_play = len(ab.get("runsScored") or [])
+            rbi = ab.get("rbiCount") or 0
+
+            bucket = buckets[_base_state_key(ab.get("baseRunnersBeforePlay"))]
+            _accumulate(bucket, outcome, is_ab, False, rbi)
+            bucket["r"] += runs_this_play
+
+            if ab.get("runnersInScoringPosition"):
+                _accumulate(buckets["risp"], outcome, is_ab, False, rbi)
+                buckets["risp"]["r"] += runs_this_play
+
+    for buckets in teams.values():
+        for totals in buckets.values():
+            _finalize(totals)
+
+    return teams
