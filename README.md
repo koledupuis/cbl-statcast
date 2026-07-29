@@ -1,5 +1,67 @@
 # CBL Stats
 
+## Fixed: Game Log season totals didn't match the Overview tab's official stats
+
+Real bug, found from a user-reported screenshot comparison (Yasiel
+Puig: Overview showed .396/.496/.813, Game Log's own Season Totals
+row showed .378/.465/.786 -- same games count, same HR and RBI, but
+different rate stats).
+
+**Root cause:** `gameday.build_batting_box` and `gameday.build_pitching_box`
+-- the two functions that turn one game's raw at-bat stream into a
+per-player box score, used by every Game Log on the site -- never
+checked `isComplete` on each at-bat. Every *other* at-bat walk in this
+app (`splits.py`, `stadiums.py`, `pitching_splits.py`) filters on it;
+these two were the only exceptions. A leftover/incomplete at-bat
+record in the raw stream got counted as a real plate appearance,
+inflating AB (and whatever its outcome happened to be) beyond what
+CBL's own official season aggregate ever counted -- which is exactly
+why HR/RBI still matched (a phantom at-bat isn't especially likely to
+land on either) while AVG/OBP/SLG/OPS quietly diverged. The existing
+"Heads up" coverage-mismatch warning never caught this because it
+only compares the *count* of games found, not the totals within them
+-- so a discrepancy could hide even when every game was accounted for.
+
+**Fix:** both functions now skip any at-bat where `isComplete` is
+falsy, matching every other walk in the codebase.
+`gameday.build_play_by_play` (the live play-by-play feed) was
+deliberately left alone -- showing an in-progress at-bat there is
+correct for a live game view, not a bug.
+
+Reproduced the exact bug shape with constructed data first (3 real
+at-bats plus 1 incomplete one, confirmed the old code would have
+shown AB=4/SO=2/AVG=.500 against an official AB=3/H=2/AVG=.667), then
+confirmed the fix brings the game log's own summed totals back in
+line with the official row exactly. Also confirmed the pitching side
+independently. This fix touches functions used throughout the whole
+app (game logs, bullpen availability, pitcher-started detection), so
+ran the full site regression afterward.
+
+
+## Home/Away, Park, and Umpire splits converted to dropdowns; caught-stealing checked but not added
+
+Converted all five remaining always-expanded split sections to the
+same `<details>` dropdown pattern used everywhere else on the player
+page: batting Home/Away, batting Park, batting Umpire, Pitching Park,
+Pitching Umpire. Tested all five render as collapsible dropdowns with
+real data.
+
+**Caught-stealing for fielding: checked, and it's not there.**
+Searched every module that touches stolen-base/caught-stealing data
+(`baserunning.py`, `gameday.py`'s raw event parser) rather than
+assume either way. What's confirmed real: CBL tracks stolen bases and
+caught-stealing from the **runner's** side (`playerBattingStats.stolenBases`
+/ `.caughtStealing`, already surfaced elsewhere on the player page) --
+but the caught-stealing event data itself only records which runner
+was thrown out, never which fielder/catcher was responsible. There's
+no path from "a runner got caught stealing" to "credit the catcher"
+in anything CBL's feed exposes. Rather than guess at attribution (e.g.
+assuming whoever was catching that half-inning gets credit, which
+could be wrong if the pitcher or another fielder made the actual play),
+this stays undone -- a made-up number would be worse than no number
+at all on a page whose whole appeal is showing only real data.
+
+
 ## Obscure Stats: 6 new categories (12 total), 3-column grid layout
 
 **On-base streak added**, as asked -- reuses rolling.py's own
