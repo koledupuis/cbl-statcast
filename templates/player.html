@@ -487,73 +487,83 @@
   </div>
   {% endif %}
 
-  <div class="section-title">Home / Away Splits</div>
   {% if home_away %}
-  <table class="stat-table" style="margin-bottom:8px;">
-    <thead><tr>
-      <th>Split</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ '2B'|abbr }}</th><th>{{ '3B'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
-      <th>{{ 'RBI'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
-    </tr></thead>
-    <tbody>
-      {% for key, label in [("home", "Home"), ("away", "Away")] %}
-      {% set s = home_away[key] %}
-      <tr>
-        <td><b>{{ label }}</b></td>
-        <td>{{ s.pa }}</td><td>{{ s.ab }}</td><td>{{ s.h }}</td>
-        <td>{{ s.doubles }}</td><td>{{ s.triples }}</td><td>{{ s.hr }}</td>
-        <td>{{ s.rbi }}</td><td>{{ s.bb }}</td><td>{{ s.so }}</td>
-        <td>{{ s.avg|fmt3 }}</td><td>{{ s.obp|fmt3 }}</td><td>{{ s.slg|fmt3 }}</td><td>{{ s.ops|fmt3 }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <div class="empty-state">Home/away splits aren't available right now.</div>
+  <details class="splits-dropdown" style="margin-top:12px;">
+    <summary>Home / Away Splits</summary>
+    <div class="splits-table-wrap">
+    <table class="stat-table">
+      <thead><tr>
+        <th>Split</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ '2B'|abbr }}</th><th>{{ '3B'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+        <th>{{ 'RBI'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
+      </tr></thead>
+      <tbody>
+        {% for key, label in [("home", "Home"), ("away", "Away")] %}
+        {% set s = home_away[key] %}
+        <tr>
+          <td><b>{{ label }}</b></td>
+          <td>{{ s.pa }}</td><td>{{ s.ab }}</td><td>{{ s.h }}</td>
+          <td>{{ s.doubles }}</td><td>{{ s.triples }}</td><td>{{ s.hr }}</td>
+          <td>{{ s.rbi }}</td><td>{{ s.bb }}</td><td>{{ s.so }}</td>
+          <td>{{ s.avg|fmt3 }}</td><td>{{ s.obp|fmt3 }}</td><td>{{ s.slg|fmt3 }}</td><td>{{ s.ops|fmt3 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
   {% endif %}
 
   {% if park_splits %}
-  <div class="section-title" style="margin-top:20px;">Park Splits</div>
-  <div class="section-sub">Every park played at this season &middot; uses CBL's own venue field when a game has one, otherwise labeled by home team</div>
-  <table class="stat-table" style="margin-bottom:8px;">
-    <thead><tr>
-      <th>Park</th><th>{{ 'G'|abbr }}</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
-      <th>{{ 'RBI'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
-    </tr></thead>
-    <tbody>
-      {% for p in park_splits %}
-      <tr>
-        <td><b>{{ p.park }}</b></td>
-        <td>{{ p.games }}</td><td>{{ p.pa }}</td><td>{{ p.ab }}</td><td>{{ p.h }}</td><td>{{ p.hr }}</td>
-        <td>{{ p.rbi }}</td>
-        <td>{{ p.avg|fmt3 }}</td><td>{{ p.obp|fmt3 }}</td><td>{{ p.slg|fmt3 }}</td><td>{{ p.ops|fmt3 }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <details class="splits-dropdown" style="margin-top:12px;">
+    <summary>Park Splits</summary>
+    <div class="section-sub" style="padding:0 14px;">Every park played at this season &middot; uses CBL's own venue field when a game has one, otherwise labeled by home team</div>
+    <div class="splits-table-wrap">
+    <table class="stat-table">
+      <thead><tr>
+        <th>Park</th><th>{{ 'G'|abbr }}</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+        <th>{{ 'RBI'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
+      </tr></thead>
+      <tbody>
+        {% for p in park_splits %}
+        <tr>
+          <td><b>{{ p.park }}</b></td>
+          <td>{{ p.games }}</td><td>{{ p.pa }}</td><td>{{ p.ab }}</td><td>{{ p.h }}</td><td>{{ p.hr }}</td>
+          <td>{{ p.rbi }}</td>
+          <td>{{ p.avg|fmt3 }}</td><td>{{ p.obp|fmt3 }}</td><td>{{ p.slg|fmt3 }}</td><td>{{ p.ops|fmt3 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
   {% endif %}
 
   {% if umpire_splits %}
-  <div class="section-title" style="margin-top:20px;">Umpire Splits</div>
-  <div class="section-sub">By home plate umpire this season &middot; games with no identifiable umpire on record are excluded, not lumped into an "Unknown" row</div>
-  <table class="stat-table" style="margin-bottom:8px;">
-    <thead><tr>
-      <th>Umpire</th><th>{{ 'G'|abbr }}</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
-      <th>{{ 'RBI'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
-    </tr></thead>
-    <tbody>
-      {% for u in umpire_splits %}
-      <tr>
-        <td><b>{{ u.umpire }}</b></td>
-        <td>{{ u.games }}</td><td>{{ u.pa }}</td><td>{{ u.ab }}</td><td>{{ u.h }}</td><td>{{ u.hr }}</td>
-        <td>{{ u.rbi }}</td><td>{{ u.bb }}</td><td>{{ u.so }}</td>
-        <td>{{ u.avg|fmt3 }}</td><td>{{ u.obp|fmt3 }}</td><td>{{ u.slg|fmt3 }}</td><td>{{ u.ops|fmt3 }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <details class="splits-dropdown" style="margin-top:12px;">
+    <summary>Umpire Splits</summary>
+    <div class="section-sub" style="padding:0 14px;">By home plate umpire this season &middot; games with no identifiable umpire on record are excluded, not lumped into an "Unknown" row</div>
+    <div class="splits-table-wrap">
+    <table class="stat-table">
+      <thead><tr>
+        <th>Umpire</th><th>{{ 'G'|abbr }}</th><th>{{ 'PA'|abbr }}</th><th>{{ 'AB'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+        <th>{{ 'RBI'|abbr }}</th><th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'AVG'|abbr }}</th><th>{{ 'OBP'|abbr }}</th><th>{{ 'SLG'|abbr }}</th><th>{{ 'OPS'|abbr }}</th>
+      </tr></thead>
+      <tbody>
+        {% for u in umpire_splits %}
+        <tr>
+          <td><b>{{ u.umpire }}</b></td>
+          <td>{{ u.games }}</td><td>{{ u.pa }}</td><td>{{ u.ab }}</td><td>{{ u.h }}</td><td>{{ u.hr }}</td>
+          <td>{{ u.rbi }}</td><td>{{ u.bb }}</td><td>{{ u.so }}</td>
+          <td>{{ u.avg|fmt3 }}</td><td>{{ u.obp|fmt3 }}</td><td>{{ u.slg|fmt3 }}</td><td>{{ u.ops|fmt3 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
   {% endif %}
 
-  <div class="section-title">Game Log</div>
+  <div class="section-title" style="margin-top:20px;">Game Log</div>
   <div class="section-sub">2026 Summer Season &middot; grouped by month, per-game rate stats</div>
 
   {% if not game_log or not game_log.months %}
@@ -631,44 +641,52 @@
   {% endif %}
 
   {% if pitcher_park_splits %}
-  <div class="section-title" style="margin-top:{{ '32px' if b_row else '0' }};">Pitching Park Splits</div>
-  <div class="section-sub">Every park pitched at this season &middot; uses CBL's own venue field when a game has one, otherwise labeled by home team &middot; ERA is real earned-run ERA (see Game Log note)</div>
-  <table class="stat-table" style="margin-bottom:8px;">
-    <thead><tr>
-      <th>Park</th><th>{{ 'G'|abbr }}</th><th>{{ 'BF'|abbr }}</th><th>{{ 'IP'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
-      <th>{{ 'ERA'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th>
-    </tr></thead>
-    <tbody>
-      {% for p in pitcher_park_splits %}
-      <tr>
-        <td><b>{{ p.park }}</b></td>
-        <td>{{ p.games }}</td><td>{{ p.bf }}</td><td>{{ p.ip }}</td><td>{{ p.h }}</td><td>{{ p.r }}</td><td>{{ p.hr }}</td>
-        <td>{{ p.era|fmt2 }}{{ '*' if not p.era_exact }}</td><td>{{ p.whip|fmt2 if p.whip is not none else "---" }}</td><td>{{ p.avg_against|fmt3 }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <details class="splits-dropdown" style="margin-top:{{ '20px' if b_row else '12px' }};">
+    <summary>Pitching Park Splits</summary>
+    <div class="section-sub" style="padding:0 14px;">Every park pitched at this season &middot; uses CBL's own venue field when a game has one, otherwise labeled by home team &middot; ERA is real earned-run ERA (see Game Log note)</div>
+    <div class="splits-table-wrap">
+    <table class="stat-table">
+      <thead><tr>
+        <th>Park</th><th>{{ 'G'|abbr }}</th><th>{{ 'BF'|abbr }}</th><th>{{ 'IP'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+        <th>{{ 'ERA'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th>
+      </tr></thead>
+      <tbody>
+        {% for p in pitcher_park_splits %}
+        <tr>
+          <td><b>{{ p.park }}</b></td>
+          <td>{{ p.games }}</td><td>{{ p.bf }}</td><td>{{ p.ip }}</td><td>{{ p.h }}</td><td>{{ p.r }}</td><td>{{ p.hr }}</td>
+          <td>{{ p.era|fmt2 }}{{ '*' if not p.era_exact }}</td><td>{{ p.whip|fmt2 if p.whip is not none else "---" }}</td><td>{{ p.avg_against|fmt3 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
   {% endif %}
 
   {% if pitcher_umpire_splits %}
-  <div class="section-title" style="margin-top:{{ '32px' if b_row else '0' }};">Pitching Umpire Splits</div>
-  <div class="section-sub">By home plate umpire this season &middot; games with no identifiable umpire on record are excluded &middot; ERA is real earned-run ERA (see Game Log note)</div>
-  <table class="stat-table" style="margin-bottom:8px;">
-    <thead><tr>
-      <th>Umpire</th><th>{{ 'G'|abbr }}</th><th>{{ 'BF'|abbr }}</th><th>{{ 'IP'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
-      <th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'ERA'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th>
-    </tr></thead>
-    <tbody>
-      {% for u in pitcher_umpire_splits %}
-      <tr>
-        <td><b>{{ u.umpire }}</b></td>
-        <td>{{ u.games }}</td><td>{{ u.bf }}</td><td>{{ u.ip }}</td><td>{{ u.h }}</td><td>{{ u.r }}</td><td>{{ u.hr }}</td>
-        <td>{{ u.bb }}</td><td>{{ u.so }}</td>
-        <td>{{ u.era|fmt2 }}{{ '*' if not u.era_exact }}</td><td>{{ u.whip|fmt2 if u.whip is not none else "---" }}</td><td>{{ u.avg_against|fmt3 }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <details class="splits-dropdown" style="margin-top:12px;">
+    <summary>Pitching Umpire Splits</summary>
+    <div class="section-sub" style="padding:0 14px;">By home plate umpire this season &middot; games with no identifiable umpire on record are excluded &middot; ERA is real earned-run ERA (see Game Log note)</div>
+    <div class="splits-table-wrap">
+    <table class="stat-table">
+      <thead><tr>
+        <th>Umpire</th><th>{{ 'G'|abbr }}</th><th>{{ 'BF'|abbr }}</th><th>{{ 'IP'|abbr }}</th><th>{{ 'H'|abbr }}</th><th>{{ 'R'|abbr }}</th><th>{{ 'HR'|abbr }}</th>
+        <th>{{ 'BB'|abbr }}</th><th>{{ 'SO'|abbr }}</th><th>{{ 'ERA'|abbr }}</th><th>{{ 'WHIP'|abbr }}</th><th>{{ 'AVG'|abbr }}</th>
+      </tr></thead>
+      <tbody>
+        {% for u in pitcher_umpire_splits %}
+        <tr>
+          <td><b>{{ u.umpire }}</b></td>
+          <td>{{ u.games }}</td><td>{{ u.bf }}</td><td>{{ u.ip }}</td><td>{{ u.h }}</td><td>{{ u.r }}</td><td>{{ u.hr }}</td>
+          <td>{{ u.bb }}</td><td>{{ u.so }}</td>
+          <td>{{ u.era|fmt2 }}{{ '*' if not u.era_exact }}</td><td>{{ u.whip|fmt2 if u.whip is not none else "---" }}</td><td>{{ u.avg_against|fmt3 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
   {% endif %}
 
   <div class="section-title" style="margin-top:{{ '32px' if b_row else '0' }};">Pitching Game Log</div>
