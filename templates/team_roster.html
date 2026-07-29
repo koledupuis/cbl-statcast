@@ -2,7 +2,7 @@
 {% block title %}{{ team_name }} Roster &middot; CBL Stats{% endblock %}
 
 {% macro status_badge(status) %}
-{% if status and status != 'active' %}<span class="status-badge status-{{ status }}">{{ status|replace('_', ' ')|title }}</span>{% endif %}
+{% if status and status not in ['active', 'call_up_list'] %}<span class="status-badge status-{{ status }}">{{ 'Free Agent' if status == 'released' else status|replace('_', ' ')|title }}</span>{% endif %}
 {% endmacro %}
 
 {% block content %}
@@ -15,9 +15,9 @@
       {% if team_pitching_line %}{{ team_pitching_line.players }} pitchers{% endif %}
       &middot; <a href="{{ url_for('team_splits', team_name=team_name) }}" style="color:inherit; text-decoration:underline;">View Team Splits</a>
       &middot; {% if active_only %}
-        <a href="{{ url_for('team_roster', team_name=team_name) }}" style="color:inherit; text-decoration:underline;">Show All Players</a>
+        <a href="{{ url_for('team_roster', team_name=team_name, active_only=0) }}" style="color:inherit; text-decoration:underline;">Show All Players</a>
       {% else %}
-        <a href="{{ url_for('team_roster', team_name=team_name, active_only=1) }}" style="color:inherit; text-decoration:underline;">Active Roster Only</a>
+        <a href="{{ url_for('team_roster', team_name=team_name) }}" style="color:inherit; text-decoration:underline;">Active Roster Only</a>
       {% endif %}
     </div>
   </div>
