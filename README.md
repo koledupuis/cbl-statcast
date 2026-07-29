@@ -1,5 +1,44 @@
 # CBL Stats
 
+## New Obscure Stats page, game logs converted to dropdowns, and a real gap fixed along the way
+
+**New `/leaderboard/obscure` tab.** Six top-5 leaderboards nobody
+would think to look up: current active streak of innings pitched
+without allowing a home run (your example -- built fresh, walks
+backward through a pitcher's game log and stops at the most recent
+home run allowed), longest active scoreless streak and longest active
+hit streak (both reuse already-tested functions rather than
+reinventing them), plus three cheap season-row-derived rates that
+never had their own leaderboard before: Isolated Power, BB/K, K/BB.
+Tested the new HR-less-streak logic against a constructed 3-game
+sequence specifically designed so an easy off-by-one (including the
+wrong game, or stopping one game too early/late) would show up, and
+it came back exactly right.
+
+**Fielding splits: confirmed the actual gap, then fixed it.** You
+were right to ask for a check -- the monthly/day-night fielding
+functions from last session were tested in isolation but never wired
+into the player page. Fixed that. While verifying it I also found a
+real (if narrow) pre-existing issue: the whole tabs interface requires
+`b_row or p_row`, so a player with fielding data but zero batting/
+pitching data would see no tabs at all. Widened that to include
+`f_row`. There's a deeper nesting issue that still means such a player
+specifically won't see the Fielding tab's content -- documented in the
+code rather than fixed, since untangling it risked the gamelog/splits/
+advanced tabs for very little practical benefit (virtually every
+fielder in this league's real data also has a batting line).
+
+**Game logs converted to dropdowns**, matching last session's splits
+treatment: a season-totals summary now sits at the top of both the
+batting and pitching Game Log tabs (always visible), with each month
+collapsed into its own `<details>` dropdown instead of one long
+always-expanded table. While converting the pitching side, a rigorous
+stack-based balance check (more precise than a simple open/close
+count) turned up a genuinely pre-existing stray `{% endif %}` with
+nothing to close, sitting a few lines below where I was working --
+fixed it once found.
+
+
 ## Player page: "Free Agent" for released players, call-up hidden, traded team shown first
 
 Individual player pages now show roster status too (previously only

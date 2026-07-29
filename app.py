@@ -25,6 +25,7 @@ import player_merge
 import rolling
 import splits as player_splits
 import stats
+import obscure_stats
 import stadiums
 import team_schedule
 import transactions
@@ -207,6 +208,19 @@ def leaderboard_fielding():
     return render_template("leaderboard.html", category="fielding", rows=rows, active="fielding",
                             teams=_team_options(all_rows), selected_team=team,
                             active_sort=active_sort, active_dir=active_dir)
+
+
+@app.route("/leaderboard/obscure")
+def leaderboard_obscure():
+    """Fun/obscure stat leaderboards nobody thinks to look up -- see
+    obscure_stats.py for exactly what's computed and the cost tradeoffs
+    of each category (some are cheap season-row arithmetic, others need
+    a per-qualifying-player game-log walk)."""
+    try:
+        categories = obscure_stats.build_all_obscure_stats()
+    except Exception:
+        categories = []
+    return render_template("obscure_stats.html", categories=categories, active="obscure")
 
 
 @app.route("/leaderboard/stadiums")
@@ -1027,6 +1041,8 @@ def player_page(player_id):
     quality_pa = None
     batted_ball_profile = None
     fielding_position_splits = None
+    fielding_monthly_splits = None
+    fielding_daynight_splits = None
     pitcher_scoreless_streak = None
 
     game_log_coverage = None
@@ -1128,6 +1144,14 @@ def player_page(player_id):
             fielding_position_splits = fielding_splits.build_fielding_position_splits(player_id, f_team_names)
         except Exception:
             fielding_position_splits = None
+        try:
+            fielding_monthly_splits = fielding_splits.build_fielding_monthly_splits(player_id, f_team_names)
+        except Exception:
+            fielding_monthly_splits = None
+        try:
+            fielding_daynight_splits = fielding_splits.build_fielding_daynight_splits(player_id, f_team_names)
+        except Exception:
+            fielding_daynight_splits = None
 
     return render_template(
         "player.html",
@@ -1163,6 +1187,8 @@ def player_page(player_id):
         quality_pa=quality_pa,
         batted_ball_profile=batted_ball_profile,
         fielding_position_splits=fielding_position_splits,
+        fielding_monthly_splits=fielding_monthly_splits,
+        fielding_daynight_splits=fielding_daynight_splits,
         pitcher_scoreless_streak=pitcher_scoreless_streak,
         rolling_stats=rolling_stats,
         momentum=momentum,
