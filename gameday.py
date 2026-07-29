@@ -471,6 +471,23 @@ def _batting_order(gd, side):
 def build_batting_box(gd, lookup):
     """Per-player batting line for each team: AB, R, H, 2B, 3B, HR, RBI, BB, SO.
 
+    Skips any at-bat where isComplete is False -- a real bug found via
+    a user-reported season-totals mismatch (this box score's own
+    summed AVG/OBP/SLG didn't match CBL's official season rate stats,
+    even though every game was being found). Root cause: this function
+    was counting every at-bat in the raw stream regardless of
+    completion status, unlike every other at-bat walk in this app
+    (splits.py, stadiums.py, pitching_splits.py all filter on
+    isComplete). An incomplete/leftover at-bat record inflates AB (and
+    whatever stat its outcome happened to be) without CBL's own
+    official aggregate ever counting it, which silently drags AVG/OBP/
+    SLG/OPS down relative to the real season rates -- while counting
+    stats like HR/RBI often still happened to match, since a phantom
+    incomplete at-bat isn't especially likely to land on either of
+    those specifically. That mismatch shape (counting stats agree,
+    rate stats don't, despite the games-found count matching) is
+    exactly what surfaced this.
+
     Team side is determined per at-bat from its own `halfInning` field
     ("top" = away team batting, "bottom" = home team batting) -- NOT from
     whether the player happens to appear in that game's roster array.
@@ -490,6 +507,8 @@ def build_batting_box(gd, lookup):
                                             "hr": 0, "rbi": 0, "bb": 0, "so": 0})
 
     for ab in at_bats:
+        if not ab.get("isComplete"):
+            continue
         pid = ab.get("batterId")
         if not pid:
             continue
@@ -541,6 +560,10 @@ def build_batting_box(gd, lookup):
 def build_pitching_box(gd, lookup):
     """Per-pitcher line for each team: IP, H, R, BB, SO, HR, pitch count.
 
+    Skips any at-bat where isComplete is False -- same fix and same
+    reason as build_batting_box just above (see its docstring for the
+    full writeup); this function had the identical gap.
+
     Team side is the DEFENSIVE side for each at-bat, derived from
     halfInning the same way build_batting_box derives the batting side
     (and for the same reason -- not gated on roster completeness)."""
@@ -555,6 +578,8 @@ def build_pitching_box(gd, lookup):
         return rows[side][pid]
 
     for ab in at_bats:
+        if not ab.get("isComplete"):
+            continue
         pid = ab.get("pitcherId")
         if not pid:
             continue
