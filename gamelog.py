@@ -33,7 +33,7 @@ MONTH_NAMES = [
     "July", "August", "September", "October", "November", "December",
 ]
 
-BOX_COUNTING_KEYS = ("ab", "r", "h", "doubles", "triples", "hr", "rbi", "bb", "so")
+BOX_COUNTING_KEYS = ("pa", "ab", "r", "h", "doubles", "triples", "hr", "rbi", "bb", "hbp", "so")
 
 
 def _field(d, *names, default=None):
@@ -240,13 +240,19 @@ def _game_rates(row):
     ab = row.get("ab") or 0
     h = row.get("h") or 0
     bb = row.get("bb") or 0
+    hbp = row.get("hbp") or 0
     doubles = row.get("doubles") or 0
     triples = row.get("triples") or 0
     hr = row.get("hr") or 0
     singles = max(h - doubles - triples - hr, 0)
     tb = singles + 2 * doubles + 3 * triples + 4 * hr
-    pa = ab + bb  # HBP/SF aren't tracked by gameday.build_batting_box today
-    obp = stats.safe_div(h + bb, pa)
+    # PA now comes straight from the box score's own count (every
+    # completed plate appearance), not derived as ab+bb -- that formula
+    # silently dropped HBP/sac flies/sac bunts/catcher interference from
+    # PA entirely. Falls back to ab+bb+hbp only if an older cached box
+    # (from before this fix) doesn't have "pa" at all.
+    pa = row.get("pa") if row.get("pa") is not None else (ab + bb + hbp)
+    obp = stats.safe_div(h + bb + hbp, pa)
     slg = stats.safe_div(tb, ab)
     return {
         "pa": pa,

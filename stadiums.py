@@ -61,7 +61,7 @@ def _accumulate_batting(totals, ab):
             totals["triples"] += 1
         elif outcome == "home_run":
             totals["hr"] += 1
-    elif outcome == "walk":
+    elif outcome in gameday.WALK_OUTCOMES:
         totals["bb"] += 1
     if outcome in gameday.STRIKEOUT_OUTCOMES:
         totals["so"] += 1
@@ -214,7 +214,7 @@ def build_park_detail(venue_name, season_year=None):
                 pitching["h"] += 1
                 if outcome == "home_run":
                     pitching["hr"] += 1
-            elif outcome == "walk":
+            elif outcome in gameday.WALK_OUTCOMES:
                 pitching["bb"] += 1
             if outcome in gameday.STRIKEOUT_OUTCOMES:
                 pitching["so"] += 1

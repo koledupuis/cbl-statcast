@@ -731,7 +731,7 @@ def build_recent_pa_breakdown(player_id, team_names, target_pa=50):
                 counts["triple"] += 1
             elif outcome == "home_run":
                 counts["hr"] += 1
-            elif outcome in ("walk", "hit_by_pitch"):
+            elif outcome in gameday.WALK_OUTCOMES or outcome == "hit_by_pitch":
                 counts["bb_hbp"] += 1
             elif outcome in ("strikeout_looking", "strikeout_swinging"):
                 counts["so"] += 1

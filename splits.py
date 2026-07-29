@@ -177,7 +177,7 @@ def _is_quality_pa(ab):
     outcome = ab.get("outcome") or ""
     if outcome in gameday.HIT_OUTCOMES:
         return True
-    if outcome in ("walk", "hit_by_pitch"):
+    if outcome in gameday.WALK_OUTCOMES or outcome == "hit_by_pitch":
         return True
     if outcome in ("sacrifice_fly", "sacrifice_bunt"):
         return True
@@ -261,7 +261,7 @@ def _accumulate(totals, outcome, is_ab, scored, rbi):
             totals["triples"] += 1
         elif outcome == "home_run":
             totals["hr"] += 1
-    elif outcome == "walk":
+    elif outcome in gameday.WALK_OUTCOMES:
         totals["bb"] += 1
     elif outcome == "hit_by_pitch":
         totals["hbp"] += 1
@@ -310,7 +310,7 @@ def _accumulate_team(totals, outcome, is_ab, runs, rbi):
             totals["triples"] += 1
         elif outcome == "home_run":
             totals["hr"] += 1
-    elif outcome == "walk":
+    elif outcome in gameday.WALK_OUTCOMES:
         totals["bb"] += 1
     elif outcome == "hit_by_pitch":
         totals["hbp"] += 1

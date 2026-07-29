@@ -136,7 +136,7 @@ def _accumulate(totals, ab):
         totals["h"] += 1
         if outcome == "home_run":
             totals["hr"] += 1
-    elif outcome == "walk":
+    elif outcome in gameday.WALK_OUTCOMES:
         totals["bb"] += 1
     if outcome in gameday.STRIKEOUT_OUTCOMES:
         totals["so"] += 1

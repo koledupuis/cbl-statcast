@@ -1,5 +1,66 @@
 # CBL Stats
 
+## Found the real cause of the AVG mismatch: intentional walks were being counted as at-bats
+
+You were right that the numbers were still off after the first fix.
+That one (incomplete at-bats) was real, but it wasn't the whole story
+for this specific case. Here's how it got tracked down and what's
+actually fixed now.
+
+**The investigation.** You provided the official league site's numbers
+directly (PA=119, AB=96, H=38, BB=19, SO=14), which let me line up
+four independent sources side by side: the official page, CBL's own
+in-app analytics feed, and this app's two separate internal walks
+(`gamelog.py` for the Game Log tab, `splits.py` for the Splits tab).
+H was consistent everywhere (~37-38). AB, though, was a very specific
+pattern: this app's AB was 2-3 *over* the official number, and BB was
+almost exactly 3 *under* -- the signature of some walks not being
+recognized as walks at all, falling through to the default "counts as
+an at-bat" bucket instead.
+
+**Root cause: `intentional_walk`.** This app's outcome-checking
+everywhere only recognized the literal string `"walk"` -- CBL very
+likely has a separate outcome value for intentional walks that nothing
+in this codebase was checking for. This wasn't one isolated bug; the
+same literal `"walk"` check was duplicated across `gameday.py`,
+`splits.py`, `stadiums.py`, `pitching_splits.py`, and
+`broadcast_overlay.py`, so it would have silently affected AB/BB
+counts everywhere in the app, not just the Game Log.
+
+**Fix:** a single new `gameday.WALK_OUTCOMES = {"walk", "intentional_walk"}`
+constant, with every one of those five files updated to check against
+it instead of the bare string. Tested directly: a plate-appearance
+sequence with a single, an intentional walk, a regular walk, an HBP,
+and a strikeout now correctly counts 2 AB (not 4) and 2 BB (not 0),
+verified independently through both `gamelog.py` and `splits.py`.
+
+**Honesty check on "intentional_walk" as the exact string:** this is
+inferred from how well it explains the numerical pattern (AB over by
+~3, BB under by ~3, at a real player's actual season), not confirmed
+against a raw payload the way "walk" itself has been elsewhere in this
+codebase. Flagged as such directly in the code. If the real string
+turns out to be spelled differently, the same mismatch would resurface
+and need a fresh check against a live payload.
+
+**Also fixed while in there:** `gamelog.py`'s Game Log was computing
+PA as `ab + bb`, silently excluding HBP, sacrifice flies, sacrifice
+bunts, and catcher interference from PA entirely (there was even a
+comment admitting it). `gameday.build_batting_box` now tracks PA and
+HBP directly, incrementing PA once for every real completed plate
+appearance, matching how `splits.py` already did it correctly.
+
+**What's still not fully reconciled, stated honestly:** even CBL's own
+in-app analytics feed (a completely different endpoint than the
+official season-stats page) shows AB=96 but H=37, not H=38. Since that
+gap exists *within CBL's own data*, between two feeds this app doesn't
+control, it's not something fixable from this side -- their official
+page may be computed by a process that doesn't perfectly reconcile
+with their own play-by-play data 100% of the time. This app's numbers
+should now land much closer to official than before, but may not be
+pixel-perfect for every player in every case, and that's a real
+data-source limitation, not something being papered over.
+
+
 ## Fixed: Game Log season totals didn't match the Overview tab's official stats
 
 Real bug, found from a user-reported screenshot comparison (Yasiel

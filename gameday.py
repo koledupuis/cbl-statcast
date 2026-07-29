@@ -44,7 +44,10 @@ exhaustive -- anything unrecognized just falls through safely):
   outs:        strikeout_looking, strikeout_swinging, dropped_third_strike_out,
                fly_out, pop_out, ground_out, line_out, double_play,
                sacrifice_bunt, sacrifice_fly, fielders_choice
-  non at-bats: walk, sacrifice_bunt, sacrifice_fly, hit_by_pitch,
+  non at-bats: walk, intentional_walk (see WALK_OUTCOMES's own comment --
+               inferred from numerical reconciliation against CBL's
+               official stats page, not yet directly confirmed against a
+               raw payload), sacrifice_bunt, sacrifice_fly, hit_by_pitch,
                catcher_interference
   other:       error (counts as an AB, not a hit -- confirmed against a
                real fixture; a batter reaching on a fielding error is
@@ -68,7 +71,18 @@ from collections import OrderedDict
 
 HIT_OUTCOMES = {"single", "double", "triple", "home_run", "bunt_single"}
 STRIKEOUT_OUTCOMES = {"strikeout_looking", "strikeout_swinging", "dropped_third_strike_out"}
-NON_AB_OUTCOMES = {"walk", "sacrifice_bunt", "sacrifice_fly", "hit_by_pitch", "catcher_interference"}
+# "intentional_walk" added from numerical reconciliation against CBL's own
+# official season stats page (not yet directly confirmed against a raw
+# payload the way "walk" itself has been) -- a real player's site AB/BB
+# were off from the official page by the same ~3, in opposite directions
+# (AB over, BB under), which is exactly the signature of some walks
+# using a distinct outcome string this app wasn't recognizing as a walk
+# at all, so they fell through to the default "counts as an AB" bucket.
+# If intentional walks turn out to use a different exact string than this,
+# the same mismatch would resurface and need re-checking against a live
+# payload.
+WALK_OUTCOMES = {"walk", "intentional_walk"}
+NON_AB_OUTCOMES = {"sacrifice_bunt", "sacrifice_fly", "hit_by_pitch", "catcher_interference"} | WALK_OUTCOMES
 BALL_RESULTS = {"ball"}
 STRIKE_RESULTS = {"called_strike", "swinging_strike"}
 FOUL_RESULTS = {"foul"}
@@ -503,8 +517,8 @@ def build_batting_box(gd, lookup):
     rows = {"away": {}, "home": {}}
 
     def row(side, pid):
-        return rows[side].setdefault(pid, {"ab": 0, "r": 0, "h": 0, "doubles": 0, "triples": 0,
-                                            "hr": 0, "rbi": 0, "bb": 0, "so": 0})
+        return rows[side].setdefault(pid, {"pa": 0, "ab": 0, "r": 0, "h": 0, "doubles": 0, "triples": 0,
+                                            "hr": 0, "rbi": 0, "bb": 0, "hbp": 0, "so": 0})
 
     for ab in at_bats:
         if not ab.get("isComplete"):
@@ -515,8 +529,18 @@ def build_batting_box(gd, lookup):
         side = "away" if (ab.get("halfInning") or "top") == "top" else "home"
         outcome = ab.get("outcome", "")
         r = row(side, pid)
+        # PA is a straight count of every completed plate appearance --
+        # NOT derived from ab+bb after the fact (that formula silently
+        # dropped HBP/sac flies/sac bunts/catcher interference from PA
+        # entirely, confirmed via a real mismatch against CBL's own
+        # official season stats page: this app's PA came in noticeably
+        # lower than official with the gap matching exactly what those
+        # missing categories would add).
+        r["pa"] += 1
         if outcome not in NON_AB_OUTCOMES:
             r["ab"] += 1
+        if outcome == "hit_by_pitch":
+            r["hbp"] += 1
         if outcome in HIT_OUTCOMES:
             r["h"] += 1
             if outcome == "double":
@@ -525,7 +549,7 @@ def build_batting_box(gd, lookup):
                 r["triples"] += 1
             elif outcome == "home_run":
                 r["hr"] += 1
-        elif outcome == "walk":
+        elif outcome in WALK_OUTCOMES:
             r["bb"] += 1
         if outcome in STRIKEOUT_OUTCOMES:
             r["so"] += 1
@@ -593,7 +617,7 @@ def build_pitching_box(gd, lookup):
             r["h"] += 1
             if outcome == "home_run":
                 r["hr"] += 1
-        elif outcome == "walk":
+        elif outcome in WALK_OUTCOMES:
             r["bb"] += 1
         if outcome in STRIKEOUT_OUTCOMES:
             r["so"] += 1
