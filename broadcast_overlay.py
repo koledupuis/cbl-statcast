@@ -735,7 +735,7 @@ def build_recent_pa_breakdown(player_id, team_names, target_pa=50):
                 counts["bb_hbp"] += 1
             elif outcome in ("strikeout_looking", "strikeout_swinging"):
                 counts["so"] += 1
-            elif outcome in gameday.NON_AB_OUTCOMES:
+            elif gameday.is_non_ab_outcome(ab):
                 continue  # sac bunts/flies etc -- not a hit, walk, or strikeout; skip from this specific chart
             else:
                 counts["other_out"] += 1

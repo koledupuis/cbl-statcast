@@ -49,7 +49,7 @@ def _accumulate_batting(totals, ab):
     by the season-wide per-venue walk and the single-park detail walk
     below, rather than duplicated in each."""
     outcome = ab.get("outcome") or ""
-    is_ab = outcome not in gameday.NON_AB_OUTCOMES
+    is_ab = not gameday.is_non_ab_outcome(ab)
     totals["pa"] += 1
     if is_ab:
         totals["ab"] += 1

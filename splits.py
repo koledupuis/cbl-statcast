@@ -362,7 +362,7 @@ def build_team_situational_batting(team_name, season_year=None):
                 continue
 
             outcome = ab.get("outcome") or ""
-            is_ab = outcome not in gameday.NON_AB_OUTCOMES
+            is_ab = not gameday.is_non_ab_outcome(ab)
             runs = len(ab.get("runsScored") or [])
             rbi = ab.get("rbiCount") or 0
             before = ab.get("baseRunnersBeforePlay")
@@ -470,7 +470,7 @@ def build_player_splits(player_id, team_name, season_year=None):
 
             if ab.get("batterId") == player_id and ab.get("isComplete"):
                 outcome = ab.get("outcome") or ""
-                is_ab = outcome not in gameday.NON_AB_OUTCOMES
+                is_ab = not gameday.is_non_ab_outcome(ab)
                 scored = player_id in (ab.get("runsScored") or [])
                 rbi = ab.get("rbiCount") or 0
 
@@ -627,7 +627,7 @@ def build_team_situational_batting(team_name, season_year=None):
             if ab.get("halfInning") != our_half or not ab.get("isComplete"):
                 continue
             outcome = ab.get("outcome") or ""
-            is_ab = outcome not in gameday.NON_AB_OUTCOMES
+            is_ab = not gameday.is_non_ab_outcome(ab)
             runs_this_play = len(ab.get("runsScored") or [])
             rbi = ab.get("rbiCount") or 0
 

@@ -1,5 +1,44 @@
 # CBL Stats
 
+## Trying a sacrifice-fly fix -- speculative, not confirmed like the walk fix was
+
+Two players' remaining AVG gaps pointed the same direction: Puig's
+July at-bats were 2 over exactly where his season sac-fly total was
+2, and Ohta's gap lines up with his 3 confirmed sac flies. That's
+consistent evidence, but I want to be honest about the difference
+from the walk fix -- that one was confirmed by BB matching exactly
+once fixed. This one is still a guess.
+
+**Why this needs a different kind of fix than the walk bug.**
+`"sacrifice_fly"` was already in the excluded-from-AB set. If it's
+still happening, the more likely explanation isn't a wrong string --
+it's that CBL may represent a sac fly as a plain `"fly_out"` outcome
+plus a separate boolean flag, rather than its own distinct outcome
+value. That's a real possibility this app never checked for.
+
+**What changed:** a new `gameday.is_non_ab_outcome(ab)` that takes the
+full at-bat record (not just the outcome string) and checks a handful
+of plausible flag names (`sacrifice`, `isSacrifice`, `sacFly`, `sac`)
+on a `"fly_out"` outcome, in addition to the existing outcome-string
+check. All six places across the app that determine AB status now go
+through this one shared function instead of checking the bare outcome
+string directly. If none of these flag names are actually what CBL
+uses, this has zero effect -- it won't miscategorize anything it
+didn't already miscategorize before.
+
+**Tested:** a plain fly-out still correctly counts as an AB; a
+flagged sacrifice fly-out is correctly excluded; a fly-out with some
+unrelated truthy field (guarding against a false-positive match) is
+correctly NOT excluded; the existing distinct-outcome-string case
+still works exactly as before.
+
+**Genuinely unconfirmed:** whether CBL actually uses any of these
+flag names at all. If Ohta's and Puig's numbers don't move after this
+deploys, the sac-fly theory should be considered ruled out rather than
+re-guessed at further from photos -- at that point the more reliable
+path is getting a real look at one game's raw JSON.
+
+
 ## Found the real cause of the AVG mismatch: intentional walks were being counted as at-bats
 
 You were right that the numbers were still off after the first fix.

@@ -83,6 +83,36 @@ STRIKEOUT_OUTCOMES = {"strikeout_looking", "strikeout_swinging", "dropped_third_
 # payload.
 WALK_OUTCOMES = {"walk", "intentional_walk"}
 NON_AB_OUTCOMES = {"sacrifice_bunt", "sacrifice_fly", "hit_by_pitch", "catcher_interference"} | WALK_OUTCOMES
+# Candidate field names for a boolean "this was a sacrifice" flag on an
+# at-bat record. NOT confirmed against a live payload -- this is a
+# defensive guess, added because two separate players' season AVG came
+# in lower than CBL's official page by an amount matching their known
+# sacrifice-fly counts exactly, which is the signature of a sac fly
+# being scored as a plain "fly_out" (counted as an AB, correctly not a
+# hit) rather than excluded from AB entirely. If CBL represents a sac
+# fly as a genuinely distinct outcome string, "sacrifice_fly" above
+# already covers it; this list is for the other possibility, that it's
+# a flag on top of a "fly_out" outcome instead. If neither explanation
+# is right, this list has zero effect (no at-bat will ever match any of
+# these keys) rather than silently miscategorizing something else.
+SACRIFICE_FLAG_KEYS = ("sacrifice", "isSacrifice", "sacFly", "sac")
+
+
+def is_non_ab_outcome(ab):
+    """True if this at-bat should be excluded from AB entirely (a walk,
+    HBP, sacrifice, or catcher interference) -- takes the full at-bat
+    record, not just the outcome string, specifically so the sacrifice-
+    fly flag check above has something to look at. Use this instead of
+    a bare `outcome not in NON_AB_OUTCOMES` check wherever the full at-
+    bat dict is available."""
+    outcome = ab.get("outcome") or ""
+    if outcome in NON_AB_OUTCOMES:
+        return True
+    if outcome == "fly_out" and any(ab.get(k) for k in SACRIFICE_FLAG_KEYS):
+        return True
+    return False
+
+
 BALL_RESULTS = {"ball"}
 STRIKE_RESULTS = {"called_strike", "swinging_strike"}
 FOUL_RESULTS = {"foul"}
@@ -537,7 +567,7 @@ def build_batting_box(gd, lookup):
         # lower than official with the gap matching exactly what those
         # missing categories would add).
         r["pa"] += 1
-        if outcome not in NON_AB_OUTCOMES:
+        if not is_non_ab_outcome(ab):
             r["ab"] += 1
         if outcome == "hit_by_pitch":
             r["hbp"] += 1
