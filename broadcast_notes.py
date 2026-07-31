@@ -136,55 +136,6 @@ MIN_IP_FOR_LEADER = 10
 TOP_BATTERS_SHOWN = 3
 TOP_PITCHERS_SHOWN = 2
 
-MILESTONE_WITHIN = 3  # flag a milestone if the player is this close or fewer away
-
-# Deliberately small, amateur-summer-league-scaled thresholds (5/10/15/...,
-# not MLB-style 30/40/50 HR milestones that would basically never be
-# reached in a ~28-game season).
-BATTING_MILESTONES = [
-    ("homeRuns", "HR", [5, 10, 15, 20, 25, 30]),
-    ("rbi", "RBI", [10, 20, 30, 40, 50]),
-    ("hits", "H", [10, 20, 30, 40, 50]),
-]
-PITCHING_MILESTONES = [
-    ("wins", "wins", [5, 10, 15, 20]),
-    ("strikeoutsPitching", "strikeouts", [25, 50, 75, 100]),
-    ("saves", "saves", [5, 10, 15]),
-]
-
-
-def _milestone_watch(all_batting, all_pitching, team_name):
-    """Short list of "player is N away from milestone M" strings for one
-    team -- deliberately capped and compact (not a table) to fit the
-    one-page layout. Not meant to be exhaustive: just a couple of
-    genuine "watch for this" callouts, closest milestone per stat only.
-
-    Batting and pitching milestones are capped SEPARATELY (not one
-    combined cap) -- a single batter close to milestones in several
-    stat categories at once could otherwise fill the entire list and
-    crowd out a genuine pitcher milestone entirely."""
-    batting_found = []
-    for r in [x for x in all_batting if x.get("teamName") == team_name]:
-        name = r.get("fullName", "")
-        for stat_key, label, milestones in BATTING_MILESTONES:
-            current = r.get(stat_key) or 0
-            for m in milestones:
-                gap = m - current
-                if 0 < gap <= MILESTONE_WITHIN:
-                    batting_found.append(f"{name} is {gap} {label} from {m}")
-                    break
-    pitching_found = []
-    for r in [x for x in all_pitching if x.get("teamName") == team_name]:
-        name = r.get("fullName", "")
-        for stat_key, label, milestones in PITCHING_MILESTONES:
-            current = r.get(stat_key) or 0
-            for m in milestones:
-                gap = m - current
-                if 0 < gap <= MILESTONE_WITHIN:
-                    pitching_found.append(f"{name} is {gap} {label} from {m}")
-                    break
-    return batting_found[:1] + pitching_found[:1]
-
 BRAND_RED = colors.HexColor("#8B1E1E")
 BRAND_NAVY = colors.HexColor("#1E3A5F")  # page-2 accent for the "Team B" side of the pitcher comparison
 LIGHT_GREY = colors.HexColor("#cccccc")
@@ -741,7 +692,6 @@ def build_matchup_notes(team_a_name, team_b_name, pitcher_a_id=None, pitcher_b_i
             "starter_deep_dive": deep_dive,
             "has_selected_starter": bool(starting_pitcher_id),
             "head_to_head": _head_to_head(record, other_team_name),
-            "milestones": _milestone_watch(all_batting, all_pitching, team_name),
             "leaders": {
                 "hr": _stat_leader(all_batting, team_name, "homeRuns"),
                 "rbi": _stat_leader(all_batting, team_name, "rbi"),
@@ -778,16 +728,26 @@ def _table_style(header_only=False, font_size=8, padding=2.5):
     return TableStyle(style)
 
 
-def _stat_grid(cells, accent, cols=4):
+def _stat_grid(cells, accent, cols=4, total_width=6.5 * inch):
     """A row of small boxed "hero stat" callouts (label above a big
     bold number) -- e.g. IP / SO / Quality Starts / Longest Outing --
     built as a single-row Table with each cell independently styled,
     rather than plain text, so the key numbers actually read as
     distinct at-a-glance callouts on the page rather than a sentence.
-    `cells` is a list of (value, label) tuples."""
+    `cells` is a list of (value, label) tuples.
+
+    `total_width` defaults to a full page-width table (6.5in, matching
+    where this is used on page 1), but MUST be passed explicitly by
+    any caller placing this inside a narrower container -- e.g. the
+    page-2 pitcher cards, each of which only has ~3.3in of usable
+    width in a side-by-side layout. A real bug here (this always
+    rendering at the full 6.5in regardless of context) was pushing the
+    second pitcher's entire card off the page -- the grid alone was
+    already wider than that whole half of the page, before anything
+    below it even had a chance to render."""
     value_row = [c[0] for c in cells]
     label_row = [c[1] for c in cells]
-    t = Table([value_row, label_row], colWidths=[(6.5 * inch) / cols] * len(cells))
+    t = Table([value_row, label_row], colWidths=[total_width / cols] * len(cells))
     t.setStyle(TableStyle([
         ("FONTSIZE", (0, 0), (-1, 0), 15),
         ("FONTSIZE", (0, 1), (-1, 1), 6.5),
@@ -804,17 +764,24 @@ def _stat_grid(cells, accent, cols=4):
     return t
 
 
-def _mini_stat_table(title, rows, accent, styles):
+def _mini_stat_table(title, rows, accent, styles, label_width=2.6 * inch, value_area_width=3.9 * inch):
     """Small two/three-column stat table used repeatedly inside a
     pitcher card (Advanced Rates, Situational Splits, Platoon Splits)
     -- rows is [[label, value, value2?], ...]; a row with only two
-    entries just spans without a second value column."""
+    entries just spans without a second value column.
+
+    Same bug and same fix as _stat_grid just above: the widths here
+    used to be hardcoded assuming a full 6.5in page width
+    (label_width + value_area_width), but this is only ever placed
+    inside a page-2 pitcher card with about 3.3in of usable width --
+    real callers must pass narrower explicit widths, which
+    _pitcher_card_flowables now does."""
     flowables = [Paragraph(title, ParagraphStyle(
         "MiniTitle", parent=styles["Normal"], fontSize=8, spaceBefore=6, spaceAfter=3,
         textColor=accent, fontName="Helvetica-Bold",
     ))]
     ncols = max(len(r) for r in rows)
-    t = Table(rows, colWidths=[2.6 * inch] + [(3.9 * inch) / (ncols - 1)] * (ncols - 1) if ncols > 1 else [2.6 * inch])
+    t = Table(rows, colWidths=[label_width] + [value_area_width / (ncols - 1)] * (ncols - 1) if ncols > 1 else [label_width])
     t.setStyle(TableStyle([
         ("FONTSIZE", (0, 0), (-1, -1), 8),
         ("TEXTCOLOR", (0, 0), (0, -1), colors.grey),
@@ -895,7 +862,7 @@ def _pitcher_card_flowables(dive, team_name, accent, styles):
         (str(dive.get("starts") or 0), "STARTS"),
         (str(dive.get("quality_starts") or 0), "QUALITY STARTS"),
         (stats.fmt1(dive.get("longest_outing")) if dive.get("longest_outing") else "--", "LONGEST OUTING (IP)"),
-    ], accent))
+    ], accent, total_width=3.3 * inch))
     flowables.append(Spacer(1, 4))
     last_game_style = ParagraphStyle("LastGame", parent=styles["Normal"], fontSize=8.5,
                                       spaceBefore=2, spaceAfter=2)
@@ -919,14 +886,14 @@ def _pitcher_card_flowables(dive, team_name, accent, styles):
         ["BABIP Against", stats.fmt3(adv.get("babip_against"))],
         ["R/G Allowed", stats.fmt2(dive.get("runs_per_game"))],
         ["Scoreless Streak", f"{dive.get('scoreless_streak') or 0}G"],
-    ], accent, styles)
+    ], accent, styles, label_width=1.9 * inch, value_area_width=1.4 * inch)
 
     fp = dive.get("first_pitch") or {}
     if fp.get("bf"):
         flowables += _mini_stat_table("First-Pitch Tendency", [
             ["First Pitch Strike%", stats.fmt_pct(fp.get("first_pitch_strike_pct"))],
             ["First Pitch Ball%", stats.fmt_pct(fp.get("first_pitch_ball_pct"))],
-        ], accent, styles)
+        ], accent, styles, label_width=1.9 * inch, value_area_width=1.4 * inch)
 
     home, away, risp = dive.get("home"), dive.get("away"), dive.get("risp")
     split_rows = [["Split", "AVG", "ERA"]]
@@ -937,7 +904,8 @@ def _pitcher_card_flowables(dive, team_name, accent, styles):
     if risp and risp.get("bf"):
         split_rows.append(["RISP", stats.fmt3(risp.get("avg_against")), stats.fmt2(risp.get("era"))])
     if len(split_rows) > 1:
-        flowables += _mini_stat_table("Situational Splits", split_rows, accent, styles)
+        flowables += _mini_stat_table("Situational Splits", split_rows, accent, styles,
+                                       label_width=1.5 * inch, value_area_width=1.8 * inch)
 
     platoon = dive.get("platoon") or {}
     plat_rows = [["Split", "AVG Against"]]
@@ -946,7 +914,8 @@ def _pitcher_card_flowables(dive, team_name, accent, styles):
     if platoon.get("vsRight") and platoon["vsRight"].get("bf"):
         plat_rows.append(["vs RHB", stats.fmt3(platoon["vsRight"].get("avg_against"))])
     if len(plat_rows) > 1:
-        flowables += _mini_stat_table("Platoon Splits", plat_rows, accent, styles)
+        flowables += _mini_stat_table("Platoon Splits", plat_rows, accent, styles,
+                                       label_width=1.9 * inch, value_area_width=1.4 * inch)
 
     return flowables
 
@@ -1081,11 +1050,6 @@ def render_pdf(matchup):
     if h2h and h2h.get("results"):
         series_line = " &nbsp;&middot;&nbsp; ".join(_fmt_h2h_line(g) for g in h2h["results"])
         story.append(Paragraph(series_line, footnote))
-
-    all_milestones = a.get("milestones", []) + b.get("milestones", [])
-    if all_milestones:
-        milestone_text = "Milestone Watch: " + "; ".join(all_milestones) + "."
-        story.append(Paragraph(milestone_text, body))
 
     # ------------------------------------------- per-team column cards --
     # Batters to Watch / Pitching Matchup / Bullpen Availability used to

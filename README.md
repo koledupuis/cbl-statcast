@@ -1,5 +1,35 @@
 # CBL Stats
 
+## Fixed a real page-2 layout bug, removed Milestone Watch
+
+**Found and fixed the cause of the missing pitcher stats on page 2.**
+Both `_stat_grid` (the hero IP/Starts/Quality Starts/Longest Outing
+callouts) and `_mini_stat_table` (Advanced Rates, Situational Splits,
+Platoon Splits) hardcoded their column widths assuming they'd always
+span the *full* 6.5in page width -- but they're only ever placed
+inside a page-2 pitcher card, which only has about 3.3in of usable
+space in the side-by-side two-column layout. A 6.5in-wide table
+crammed into a 3.3in cell is exactly what pushed the second pitcher's
+entire card off the page in the PDF you sent -- the hero stat grid
+alone was already wider than that whole half of the page before
+anything below it even got a chance to render.
+
+Both functions now take the target width as an explicit parameter,
+and every call site inside `_pitcher_card_flowables` passes widths
+that actually fit the real ~3.3in card. Verified by generating a real
+test PDF with two full pitcher profiles and checking via text
+extraction that the second pitcher's card now shows every single
+Advanced Rate value (K/9 through Scoreless Streak) that was blank
+before -- not just visually inspecting, actually confirming the text
+is there.
+
+**Removed Milestone Watch entirely** per request -- the rendering
+block, the data computation, and the now-dead constants/function
+(`MILESTONE_WITHIN`, `BATTING_MILESTONES`, `PITCHING_MILESTONES`,
+`_milestone_watch`) are all gone rather than just hidden. Confirmed
+the word "Milestone" no longer appears anywhere in a generated PDF.
+
+
 ## Broadcast overlay: bigger fonts, Due Up finally wired up, batter-switch animation, live situational callout
 
 - **Font sizes increased** across the key readability elements --
