@@ -128,6 +128,7 @@ import rolling
 import splits
 import stats
 import team_schedule
+import transactions
 
 IMAGE_FETCH_TIMEOUT = 6
 
@@ -148,17 +149,33 @@ def _ops_leaders(all_batting, team_name):
     qualification and shape as _era_leaders' pitching-side pick, so
     "Batters to Watch" and "Pitchers to Watch" both work the same way:
     a straightforward season-stat leaderboard, not a derived/weighted
-    score."""
+    score.
+
+    Filtered to currently-active players first (see
+    transactions.filter_active_players) -- a released or inactive
+    player's OLD season numbers could still be good enough to rank,
+    but they don't belong on a "who to watch tonight" list. This was
+    a real gap: nothing here checked roster status at all before,
+    unlike the team roster page and the individual player page, which
+    both already did."""
     candidates = [r for r in all_batting
                   if r.get("teamName") == team_name and (r.get("plateAppearances") or 0) >= MIN_PA_FOR_LEADER]
+    candidates = transactions.filter_active_players(candidates)
     candidates.sort(key=lambda r: r.get("ops") or 0, reverse=True)
     return candidates[:TOP_BATTERS_SHOWN]
 
 
 def _era_leaders(all_pitching, team_name):
+    """Auto-selected "Pitchers to Watch" when no explicit starter was
+    given (see _pitcher_row_for_starter for that separate path, which
+    intentionally does NOT filter by roster status -- if someone
+    explicitly picked a starter, they already know that pitcher is
+    starting today). Filtered to currently-active pitchers first, same
+    reasoning and same shared filter as _ops_leaders above."""
     pitchers = [r for r in all_pitching if r.get("teamName") == team_name]
     pitchers = [r for r in pitchers
                 if ((r.get("advancedPitching") or {}).get("inningsPitchedOuts") or 0) / 3 >= MIN_IP_FOR_LEADER]
+    pitchers = transactions.filter_active_players(pitchers)
     pitchers.sort(key=lambda r: r.get("era") if r.get("era") is not None else 999)
     return pitchers[:TOP_PITCHERS_SHOWN]
 
@@ -744,20 +761,32 @@ def _stat_grid(cells, accent, cols=4, total_width=6.5 * inch):
     rendering at the full 6.5in regardless of context) was pushing the
     second pitcher's entire card off the page -- the grid alone was
     already wider than that whole half of the page, before anything
-    below it even had a chance to render."""
+    below it even had a chance to render.
+
+    Labels are wrapped in Paragraph objects (not plain strings) so a
+    long one like "LONGEST OUTING (IP)" wraps onto a second line
+    within its own cell instead of overflowing into the next column --
+    a plain string has no width constraint of its own and was
+    visually running into the neighboring label with no gap between
+    them, a real bug seen in an actual generated PDF."""
+    label_style = ParagraphStyle(
+        "StatGridLabel", fontName="Helvetica", fontSize=6.5, leading=7.5,
+        textColor=colors.grey, alignment=1,  # 1 = TA_CENTER
+    )
     value_row = [c[0] for c in cells]
-    label_row = [c[1] for c in cells]
+    label_row = [Paragraph(c[1], label_style) for c in cells]
     t = Table([value_row, label_row], colWidths=[total_width / cols] * len(cells))
     t.setStyle(TableStyle([
         ("FONTSIZE", (0, 0), (-1, 0), 15),
-        ("FONTSIZE", (0, 1), (-1, 1), 6.5),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("TEXTCOLOR", (0, 0), (-1, 0), accent),
-        ("TEXTCOLOR", (0, 1), (-1, 1), colors.grey),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
         ("TOPPADDING", (0, 0), (-1, 0), 6),
         ("BOTTOMPADDING", (0, 0), (-1, 0), 0),
+        ("TOPPADDING", (0, 1), (-1, 1), 2),
         ("BOTTOMPADDING", (0, 1), (-1, 1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
         ("BACKGROUND", (0, 0), (-1, -1), PALE_GREY),
         ("LINEBELOW", (0, -1), (-1, -1), 1, LIGHT_GREY),
     ]))

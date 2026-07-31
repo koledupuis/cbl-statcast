@@ -1,5 +1,34 @@
 # CBL Stats
 
+## Fixed the remaining page-2 label overlap, excluded inactive players from Batters/Pitchers to Watch
+
+**Label overlap fixed.** The hero stat grid's labels ("QUALITY STARTS",
+"LONGEST OUTING (IP)") were plain strings with no width constraint of
+their own -- in a narrow ~0.8in column, "STARTS" and "LONGEST" were
+running together with no visible gap, confirmed directly in the PDF
+you sent ("STARTSLONGEST OUTING (IP)"). Rewrote the label row to use
+real `Paragraph` objects with proper word-wrap, so a long label now
+wraps onto a second line within its own cell instead of overflowing
+into the next column. Verified by generating a real PDF and checking
+the extracted text no longer contains the run-together string.
+
+**Inactive players no longer show up as "to watch."** This was a real
+gap -- the team roster page and individual player pages already
+checked roster status via `transactions.py`, but "Batters to Watch"
+and the auto-selected "Pitchers to Watch" never did, so a
+released/inactive player with a still-good season line (like Austin
+Gurney) could keep getting featured. Consolidated the active-player
+filter that already existed (privately, duplicated) in
+`obscure_stats.py` into a single shared `transactions.filter_active_players()`,
+and now both `_ops_leaders` and `_era_leaders` in `broadcast_notes.py`
+use it too -- one shared filter instead of one module having it and
+another missing it entirely. Doesn't affect an explicitly-selected
+starting pitcher (if you pick someone by name, this app trusts that
+you know they're actually starting today). Tested directly: a
+higher-OPS inactive player is now correctly excluded in favor of a
+lower-OPS active one.
+
+
 ## Fixed a real page-2 layout bug, removed Milestone Watch
 
 **Found and fixed the cause of the missing pitcher stats on page 2.**

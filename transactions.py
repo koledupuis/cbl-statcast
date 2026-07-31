@@ -163,3 +163,40 @@ def player_status(full_name, season_year=None):
         return None
     all_status = build_roster_status(season_year)
     return all_status.get(full_name.strip().lower())
+
+
+OFF_ROSTER_STATUSES = {STATUS_RELEASED, STATUS_INACTIVE, STATUS_INJURED, STATUS_TRADED_AWAY, STATUS_LEFT_LEAGUE}
+
+
+def filter_active_players(rows, name_key="fullName", season_year=None):
+    """Drops any row (a season stat row, a "to watch" candidate, etc.)
+    whose player is currently a free agent, inactive, injured, or
+    otherwise off a roster -- someone no longer active doesn't belong
+    on a "current state" list (an active streak, a broadcast's
+    Batters/Pitchers to Watch, a season-to-date rate) even if their raw
+    numbers still technically qualify. Call-up status is deliberately
+    NOT filtered here -- a call-up is still an active player.
+
+    Shared by every "who's currently active" filter across the app
+    (originally duplicated once for obscure_stats.py's own leaderboards
+    and once, missing entirely, from broadcast_notes.py's Batters to
+    Watch -- moved here so there's exactly one place this logic lives).
+
+    Matched by name (this feed has no player ID); a player with no
+    matching transaction record is kept, not dropped -- "no
+    transaction on record" isn't the same claim as "confirmed
+    inactive." If the transaction fetch itself fails for any reason,
+    every row is kept unfiltered rather than the whole page coming up
+    empty over an unrelated external-service issue."""
+    try:
+        roster_status = build_roster_status(season_year)
+    except Exception:
+        return rows
+    if not roster_status:
+        return rows
+
+    def _is_active(row):
+        info = roster_status.get((row.get(name_key) or "").strip().lower())
+        return not info or info["status"] not in OFF_ROSTER_STATUSES
+
+    return [r for r in rows if _is_active(r)]

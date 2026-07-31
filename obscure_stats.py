@@ -34,40 +34,12 @@ MIN_IP_FOR_RATE = 10
 TOP_N = 5
 
 
-_OFF_ROSTER_STATUSES = {
-    transactions.STATUS_RELEASED, transactions.STATUS_INACTIVE, transactions.STATUS_INJURED,
-    transactions.STATUS_TRADED_AWAY, transactions.STATUS_LEFT_LEAGUE,
-}
-
-
 def _filter_active(rows):
-    """Drops any season row whose player is currently a free agent,
-    inactive, injured, or otherwise off a roster (per CBL's own
-    transaction log -- see transactions.py) -- these are all "current
-    state" leaderboards (an active streak, a season-to-date rate for
-    someone still playing), and someone no longer active doesn't
-    belong on them even if their numbers still technically qualify.
-    Call-up status is deliberately NOT filtered here -- a call-up is
-    still an active player.
-
-    Matched by name (that feed has no player ID); a player with no
-    matching transaction record is kept, not dropped -- "no
-    transaction on record" isn't the same claim as "confirmed
-    inactive." If the transaction fetch itself fails for any reason,
-    every row is kept unfiltered rather than the whole page coming up
-    empty over an unrelated external-service issue."""
-    try:
-        roster_status = transactions.build_roster_status()
-    except Exception:
-        return rows
-    if not roster_status:
-        return rows
-
-    def _is_active(row):
-        info = roster_status.get((row.get("fullName") or "").strip().lower())
-        return not info or info["status"] not in _OFF_ROSTER_STATUSES
-
-    return [r for r in rows if _is_active(r)]
+    """Thin wrapper around transactions.filter_active_players -- kept
+    as a local name so every call site in this module doesn't need to
+    change, now that the actual filtering logic lives in one shared
+    place instead of being duplicated per-module."""
+    return transactions.filter_active_players(rows)
 
 
 def _ip_from_row(row):
