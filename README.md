@@ -1,5 +1,31 @@
 # CBL Stats
 
+## New: team record by home plate umpire
+
+Added to the Team page, as a collapsible dropdown right after the
+existing Team Record section -- every home plate umpire who's worked
+that team's games this season, with the team's W/L record and win %
+against each one.
+
+`team_schedule.build_team_season_record()`'s existing per-game walk
+now also captures the home plate umpire (`gameday.get_home_plate_umpire`,
+already a confirmed function) alongside what it already tracked --
+no new schedule walk needed, just one more field pulled from data
+already being fetched. A new `build_umpire_record()` groups that by
+umpire; it takes the game results directly rather than re-walking the
+schedule itself, so the team page's existing `team_record` fetch is
+reused rather than doubled.
+
+Games with no identifiable umpire are excluded from the breakdown
+entirely, not lumped into an "Unknown" row -- matching the same
+convention the per-player umpire splits already use elsewhere on this
+site.
+
+Tested directly with a constructed 4-game, 2-umpire scenario: correct
+per-umpire W/L splits, and confirmed a game with no identifiable
+umpire is excluded rather than shown as an "Unknown" entry.
+
+
 ## Fixed the remaining page-2 label overlap, excluded inactive players from Batters/Pitchers to Watch
 
 **Label overlap fixed.** The hero stat grid's labels ("QUALITY STARTS",

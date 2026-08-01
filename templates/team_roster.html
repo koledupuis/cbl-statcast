@@ -79,6 +79,30 @@
   <span class="mono">team_schedule.py</span>.
 </div>
 
+{% if umpire_record %}
+<details class="splits-dropdown" style="margin-top:16px;">
+  <summary>Record by Home Plate Umpire</summary>
+  <div class="splits-table-wrap">
+  <table class="stat-table">
+    <thead><tr><th>Umpire</th><th>{{ 'G'|abbr }}</th><th>W</th><th>L</th><th>Win %</th></tr></thead>
+    <tbody>
+      {% for u in umpire_record %}
+      <tr>
+        <td><b>{{ u.umpire }}</b></td>
+        <td>{{ u.games }}</td><td>{{ u.wins }}</td><td>{{ u.losses }}</td>
+        <td>{{ u.win_pct|fmt3 if u.win_pct is not none else "---" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</details>
+<div class="note">
+  Games with no identifiable home plate umpire on record are excluded from this breakdown entirely, not
+  lumped into an "Unknown" row.
+</div>
+{% endif %}
+
 {% if team_record.diagnostics and (team_record.diagnostics.skipped_no_public_id or team_record.diagnostics.skipped_fetch_failed or team_record.diagnostics.skipped_tie) %}
 <div class="note" style="border: 1px solid var(--brick); padding: 10px 14px; margin-top:14px; font-style: normal;">
   <b>Heads up:</b> the schedule feed had {{ team_record.diagnostics.schedule_entries_found }} game{{ 's' if team_record.diagnostics.schedule_entries_found != 1 }}

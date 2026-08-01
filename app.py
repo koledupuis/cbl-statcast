@@ -614,6 +614,11 @@ def team_roster(team_name):
         team_record = None
 
     try:
+        umpire_record = team_schedule.build_umpire_record((team_record or {}).get("game_results") or [])
+    except Exception:
+        umpire_record = []
+
+    try:
         status_breakdown = gamelog.team_schedule_status_breakdown(team_name)
     except Exception:
         status_breakdown = {}
@@ -630,6 +635,7 @@ def team_roster(team_name):
         team_pitching_line=team_pitching_line,
         active_only=active_only,
         team_record=team_record,
+        umpire_record=umpire_record,
     )
 
 

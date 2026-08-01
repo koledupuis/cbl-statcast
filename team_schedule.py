@@ -21,6 +21,7 @@ Ties are skipped (shouldn't happen in baseball, but guards against a
 data-entry oddity crashing this rather than just excluding that game).
 """
 import time
+from collections import OrderedDict
 
 import cbl_api
 import gameday
@@ -184,7 +185,9 @@ def build_team_season_record(team_name, season_year=None):
       loss_pct = 1 - win_pct for that split -- there are no ties, so
       this is exact, not an independent count).
       "game_results": [{"date","opponent","is_home","team_runs","opp_runs",
-        "result" ("W"/"L"), "public_game_id"}, ...] -- every game actually
+        "result" ("W"/"L"), "public_game_id", "umpire" (home plate
+        umpire's name, or None if not identifiable for that game --
+        see gameday.get_home_plate_umpire)}, ...] -- every game actually
         counted toward the record above, in schedule order. This is the
         audit trail: if the record looks wrong, this list is exactly
         what this app found and scored, so a missing or extra date shows
@@ -254,6 +257,7 @@ def build_team_season_record(team_name, season_year=None):
             "team_runs": team_runs, "opp_runs": opp_runs,
             "result": "W" if won else "L",
             "public_game_id": public_id,
+            "umpire": gameday.get_home_plate_umpire(gd),
         })
 
         if abs(team_runs - opp_runs) == 1:
@@ -343,6 +347,48 @@ def _current_streak(game_results):
             break
         count += 1
     return f"{last_result}{count}"
+
+
+MIN_GAMES_FOR_UMPIRE_ROW = 1  # every umpire who's worked at least one game shows -- no meaningful "too small" cutoff at the team level
+
+
+def build_umpire_record(game_results):
+    """This team's win/loss record broken out by home plate umpire --
+    takes the game_results list build_team_season_record already
+    produces (which now carries the umpire per game) directly, rather
+    than re-walking the same schedule a second time. Callers that
+    don't already have a record on hand can just pass
+    build_team_season_record(team_name)["game_results"].
+
+    Games with no identifiable umpire on record are excluded entirely
+    from this breakdown, not lumped into an "Unknown" row -- same
+    convention gamelog.py's own per-player umpire splits already use
+    elsewhere on this site.
+
+    Returns a list of {"umpire", "games", "wins", "losses", "win_pct"}
+    dicts, sorted by games worked descending (most-seen umpire first).
+    Empty list if there are no games with an identifiable umpire on
+    record at all."""
+    if not game_results:
+        return []
+
+    by_umpire = OrderedDict()
+    for g in game_results:
+        umpire = g.get("umpire")
+        if not umpire:
+            continue
+        row = by_umpire.setdefault(umpire, {"umpire": umpire, "games": 0, "wins": 0, "losses": 0})
+        row["games"] += 1
+        if g["result"] == "W":
+            row["wins"] += 1
+        else:
+            row["losses"] += 1
+
+    rows = list(by_umpire.values())
+    for row in rows:
+        row["win_pct"] = safe_div(row["wins"], row["games"])
+    rows.sort(key=lambda r: r["games"], reverse=True)
+    return rows
 
 
 def build_standings(team_names, season_year=None):
