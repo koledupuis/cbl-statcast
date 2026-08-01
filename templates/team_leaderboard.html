@@ -42,6 +42,7 @@
     <th>{{ standings_sort_link('games_behind', 'GB') }}</th>
     <th>{{ standings_sort_link('run_differential', 'Run Diff') }}</th>
     <th>Pythag Win %</th>
+    <th>Magic #</th>
   </tr></thead>
   <tbody>
     {% for t in standings %}
@@ -54,10 +55,30 @@
       <td>{{ t.games_behind|fmt1 if t.games_behind is not none else "---" }}</td>
       <td>{{ "%+d"|format(t.run_differential) }}</td>
       <td>{{ t.pythagorean_win_pct|fmt3 if t.pythagorean_win_pct is not none else "---" }}</td>
+      {% set m = magic_by_team.get(t.team) %}
+      <td>
+        {% if not m or m.number is none %}
+          ---
+        {% elif m.status == 'clinched' %}
+          <span class="status-badge status-active" style="background:rgba(40,140,60,0.15); color:#1e7a34;">Clinched</span>
+        {% elif m.status == 'eliminated' %}
+          <span class="status-badge status-released">Eliminated</span>
+        {% else %}
+          {{ m.number }}
+        {% endif %}
+      </td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+<div class="note">
+  Magic Number counts down to a playoff spot for the top 5 teams (games needed, combining this team's own
+  wins with losses by the team currently in 6th); Elimination Number counts down the same way for everyone
+  else, against the team currently holding the 5th and final spot. Based on a confirmed 48-game season and
+  5-team playoff format for the 2026 CBL season (not something exposed by CBL's own API -- confirmed via
+  public league announcements instead, so this needs a manual update if either number changes in a future
+  season). Assumes a balanced schedule, standard for a magic-number calculation.
+</div>
 <div class="note">
   Built by walking every completed game on each team's schedule and reading the final score off the
   play-by-play &mdash; not pulled from a separate standings endpoint. If a team's record looks off,
