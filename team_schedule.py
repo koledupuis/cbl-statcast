@@ -433,3 +433,85 @@ def clear_standings_cache():
     standings table doesn't look like the fix didn't work."""
     _standings_cache.clear()
 
+
+# Confirmed for the 2026 season from multiple independent public sources
+# (Wikipedia's own "2026 Canadian Baseball League season" page, cbl.ca's
+# own news release announcing the rebrand from IBL to CBL, and several
+# individual team sites all reporting the same two numbers) -- NOT
+# derived from anything in CBL's own API, since nothing in cbl.ca's
+# feeds exposes season length or playoff format directly. If either
+# number changes in a future season, these need updating by hand; there's
+# no live source this app can check them against automatically.
+SEASON_TOTAL_GAMES = 48
+PLAYOFF_TEAMS = 5
+
+
+def build_magic_numbers(team_names, season_year=None):
+    """Magic number to clinch a playoff spot (for the top PLAYOFF_TEAMS
+    teams in the standings) or elimination number (for everyone else),
+    using the standard formula:
+
+      number = (SEASON_TOTAL_GAMES + 1) - wins(this team) - losses(rival)
+
+    For a team currently IN a playoff spot, "rival" is the team
+    immediately below the cutoff line (the first team on the outside)
+    -- the number counts down as this team's own wins and that rival's
+    losses accumulate, since neither can be undone; it reaches 0 (shown
+    as "Clinched") when the rival can no longer possibly catch up even
+    by winning out while this team loses out.
+
+    For a team currently OUT of a playoff spot, "rival" is the team
+    holding the LAST qualifying spot -- the elimination number counts
+    down the same way, reaching 0 ("Eliminated") when it's no longer
+    mathematically possible to catch that team.
+
+    This assumes a balanced schedule (every team plays SEASON_TOTAL_GAMES
+    total) -- standard for a magic-number calculation, and consistent
+    with what's publicly confirmed about this league's format.
+
+    Returns a list of {"team", "rank", "wins", "losses", "number",
+    "status", "in_playoff_position"} in standings order. "status" is one
+    of "clinched", "eliminated", or "alive". "number" is clamped at 0
+    for display (never shown negative) once clinched/eliminated. None
+    entries for either field mean there's no valid rival to compare
+    against yet (fewer than PLAYOFF_TEAMS+1 teams with games on record)."""
+    standings = build_standings(team_names, season_year)
+    if not standings:
+        return []
+
+    cutoff_rival = standings[PLAYOFF_TEAMS] if len(standings) > PLAYOFF_TEAMS else None
+    last_qualifier = standings[PLAYOFF_TEAMS - 1] if len(standings) >= PLAYOFF_TEAMS else None
+
+    result = []
+    for i, r in enumerate(standings):
+        rank = i + 1
+        in_playoff_position = rank <= PLAYOFF_TEAMS
+        rival = cutoff_rival if in_playoff_position else last_qualifier
+
+        number = None
+        status = "alive"
+        if rival is not None and rival is not r:
+            if in_playoff_position:
+                # Clinch: this team's wins + the chasing rival's losses.
+                raw_number = (SEASON_TOTAL_GAMES + 1) - r["wins"] - rival["losses"]
+            else:
+                # Elimination is the mirror image: the team ahead
+                # (rival)'s wins + THIS team's losses -- not the same
+                # direction as the clinch formula. Using the clinch
+                # formula's shape here was a real bug caught by testing
+                # an already-mathematically-eliminated team (2 wins, 3
+                # games left, chasing a team with 24 wins already) and
+                # finding it incorrectly reported as still alive.
+                raw_number = (SEASON_TOTAL_GAMES + 1) - rival["wins"] - r["losses"]
+            number = max(raw_number, 0)
+            if in_playoff_position:
+                status = "clinched" if raw_number <= 0 else "alive"
+            else:
+                status = "eliminated" if raw_number <= 0 else "alive"
+
+        result.append({
+            "team": r["team"], "rank": rank, "wins": r["wins"], "losses": r["losses"],
+            "number": number, "status": status, "in_playoff_position": in_playoff_position,
+        })
+    return result
+

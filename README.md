@@ -1,5 +1,38 @@
 # CBL Stats
 
+## New: Magic Number / Elimination Number on the Teams standings
+
+Added a "Magic #" column to the standings table on the Teams page --
+counts down for each of the top 5 teams to clinch a playoff spot, and
+counts down for everyone else as an elimination number against the
+team holding the 5th and final spot. Shows "Clinched"/"Eliminated"
+once a team's number reaches 0.
+
+**The two numbers this needed (season length, playoff format) aren't
+in CBL's own API anywhere** -- checked, and there's nothing in any
+feed this app uses that exposes either. Found both from public
+sources instead: multiple independent write-ups (Wikipedia's own
+"2026 Canadian Baseball League season" page, cbl.ca's own news release
+announcing the CBL rebrand, and several team sites) all confirm the
+same two numbers for 2026 -- a 48-game season, 5 playoff teams. Both
+are named constants (`SEASON_TOTAL_GAMES`, `PLAYOFF_TEAMS`) with the
+sourcing explained in a comment, flagged as something that needs a
+manual update if either changes in a future season, since there's no
+live source to check them against automatically.
+
+**Caught a real formula bug while testing.** The clinch and
+elimination calculations are mirror images of each other (clinch uses
+this team's wins + the rival's losses; elimination uses the rival's
+wins + this team's losses), and an early version used the same
+formula shape for both. Caught by deliberately testing an
+already-mathematically-eliminated team (2 wins with only 3 games left,
+chasing a team that already had 24 wins) and finding it incorrectly
+reported as still alive -- fixed before this ever went out. Reran
+that same test after the fix, plus a mid-season close-race scenario
+with hand-verified expected numbers for both a clinch-side and
+elimination-side team, and both matched exactly.
+
+
 ## New: team record by home plate umpire
 
 Added to the Team page, as a collapsible dropdown right after the

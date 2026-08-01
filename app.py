@@ -282,6 +282,12 @@ def leaderboard_teams():
     except Exception:
         standings = []
 
+    try:
+        magic_numbers = team_schedule.build_magic_numbers(all_team_names)
+    except Exception:
+        magic_numbers = []
+    magic_by_team = {m["team"]: m for m in magic_numbers}
+
     sort_key = (request.args.get("sort") or "").strip().lower()
     dir_param = (request.args.get("dir") or "").strip().lower()
 
@@ -371,6 +377,7 @@ def leaderboard_teams():
 
     return render_template("team_leaderboard.html", active="teams",
                             standings=standings,
+                            magic_by_team=magic_by_team,
                             active_standings_sort=active_standings_sort, active_standings_dir=active_standings_dir,
                             team_batting=team_batting, team_pitching=team_pitching,
                             active_sort=sort_key or None, active_dir=dir_param or None,
