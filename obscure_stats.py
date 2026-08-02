@@ -21,7 +21,6 @@ Cost profile, stated plainly since this matters for a page like this:
 """
 import analytics
 import cbl_api
-import gameday
 import gamelog
 import pitching_splits
 import rolling
@@ -299,97 +298,25 @@ def build_best_contact_rate():
     return results[:TOP_N]
 
 
-def build_most_hours_played():
-    """Top 5 TEAMS (not players) by total real-world hours of baseball
-    played this season -- confirmed real via a live payload showing
-    snapshot.setup.gameDuration as a formatted "Xh Ym" string (see
-    gameday.get_game_duration_minutes for the parser). This was
-    previously believed unavailable anywhere in CBL's feed -- an
-    earlier honest "I checked and it's not there" answer, corrected
-    once someone actually pointed at a live payload containing it.
-
-    Walks the full season schedule ONCE (gamelog._all_games -- every
-    game in the league, not once per team), attributing each game's
-    full duration to BOTH participating teams -- a team was on the
-    field for the entire game regardless of which half they were
-    batting in, so this isn't split or halved. Games with no parseable
-    duration are skipped entirely for that game (not counted as 0),
-    same "missing isn't zero" principle used everywhere else on this
-    site."""
-    totals = {}  # team_name -> total minutes
-    for g in gamelog._all_games():
-        if gamelog._field(g, "status", default="") != "completed":
-            continue
-        public_id = gamelog._field(g, "publicGameId", "public_game_id", "public-game-id")
-        if not public_id:
-            continue
-        try:
-            gd = cbl_api.get_gameday(public_id)
-        except Exception:
-            continue
-        if not gd or not gd.get("snapshot"):
-            continue
-        minutes = gameday.get_game_duration_minutes(gd)
-        if minutes is None:
-            continue
-        home = gamelog._field(g, "homeTeam", "home_team", "home-team")
-        away = gamelog._field(g, "awayTeam", "away_team", "away-team")
-        for team_name in (home, away):
-            if team_name:
-                totals[team_name] = totals.get(team_name, 0) + minutes
-
+def build_best_gb_fb_ratio():
+    """Top 5: groundball-to-flyball ratio -- pitchers who keep the
+    ball on the ground the most, relative to fly balls allowed (a
+    real, if old-school, scouting-report descriptor: "he's a
+    groundball pitcher"). Reuses analytics.pitching_advanced's own
+    gb_fb_ratio rather than recomputing it. Pure season-row
+    arithmetic."""
+    all_pitching = _filter_active(cbl_api.get_pitching())
     results = []
-    for team_name, total_minutes in totals.items():
-        hours = total_minutes / 60
+    for row in all_pitching:
+        if _ip_from_row(row) < MIN_IP_FOR_RATE:
+            continue
+        ratio = analytics.pitching_advanced(row).get("gb_fb_ratio")
+        if ratio is None:
+            continue
         results.append({
-            "playerId": None, "name": team_name, "team": team_name,
-            "value": f"{hours:.1f}", "sort_key": hours,
+            "playerId": row.get("playerId"), "name": row.get("fullName"), "team": row.get("teamName"),
+            "value": stats.fmt2(ratio), "sort_key": ratio,
         })
-    results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
-
-
-def build_longest_games():
-    """Top 5 individual GAMES (not teams or players) by real-world
-    duration this season -- same confirmed-real gameDuration field as
-    build_most_hours_played just above, same single full-schedule
-    walk pattern, just tracking one row per game instead of an
-    accumulating per-team total. Games with no parseable duration are
-    skipped entirely rather than counted as 0.
-
-    Returns rows shaped for the obscure-stats page's game-level display
-    (no playerId, no team -- a "gameId" instead, linking to that
-    game's own page) rather than either of the other two row shapes
-    this module otherwise produces."""
-    results = []
-    seen_game_ids = set()
-    for g in gamelog._all_games():
-        if gamelog._field(g, "status", default="") != "completed":
-            continue
-        public_id = gamelog._field(g, "publicGameId", "public_game_id", "public-game-id")
-        if not public_id or public_id in seen_game_ids:
-            continue
-        seen_game_ids.add(public_id)
-        try:
-            gd = cbl_api.get_gameday(public_id)
-        except Exception:
-            continue
-        if not gd or not gd.get("snapshot"):
-            continue
-        minutes = gameday.get_game_duration_minutes(gd)
-        if minutes is None:
-            continue
-        home = gamelog._field(g, "homeTeam", "home_team", "home-team")
-        away = gamelog._field(g, "awayTeam", "away_team", "away-team")
-        date = gamelog._field(g, "gameDate", "game_date", "game-date", default="")
-        hours = minutes / 60
-        label = f"{away} @ {home}" if home and away else public_id
-        results.append({
-            "playerId": None, "team": None, "gameId": public_id,
-            "name": f"{label} ({date})" if date else label,
-            "value": f"{hours:.1f}", "sort_key": minutes,
-        })
-
     results.sort(key=lambda e: e["sort_key"], reverse=True)
     return results[:TOP_N]
 
@@ -481,12 +408,9 @@ def build_all_obscure_stats():
         ("Best K/BB Ratio (Pitching)",
          "Strikeouts per walk -- swing-and-miss stuff with control, both at once",
          build_best_k_bb_ratio),
-        ("Most Hours of Baseball Played (Team)",
-         "Real-world hours on the field this season, both teams credited for every game's full duration",
-         build_most_hours_played),
-        ("Longest Games (Individual)",
-         "The single longest real-world games this season, by actual clock time",
-         build_longest_games),
+        ("Best GB/FB Ratio (Pitching)",
+         "Groundballs per flyball allowed -- the old-school \"groundball pitcher\" label, quantified",
+         build_best_gb_fb_ratio),
     ]
     result = []
     for title, subtitle, builder in categories:

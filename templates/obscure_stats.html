@@ -41,14 +41,8 @@
         <tr>
           <td class="rank-col">{{ loop.index }}</td>
           <td>
-            {% if r.playerId %}
             <a class="player-link" href="{{ url_for('player_page', player_id=r.playerId) }}">{{ r.name }}</a>
             <span class="team-tag">{{ r.team }}</span>
-            {% elif r.gameId %}
-            <a class="player-link" href="{{ url_for('game_page', public_game_id=r.gameId) }}">{{ r.name }}</a>
-            {% else %}
-            <a class="player-link" href="{{ url_for('team_roster', team_name=r.team) }}"><b>{{ r.name }}</b></a>
-            {% endif %}
           </td>
           <td style="font-weight:700; text-align:right;">{{ r.value }}</td>
         </tr>

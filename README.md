@@ -1,5 +1,34 @@
 # CBL Stats
 
+## Reverted: gameDuration-based obscure stats (data quality issue)
+
+Both "Most Hours of Baseball Played" and "Longest Games" are removed,
+fully reverted back to GB/FB Ratio as the 12th obscure stat category.
+
+**Why:** `snapshot.setup.gameDuration` was confirmed to be a real
+field with a real, parseable format ("3h 19m") -- that part was
+correct. What wasn't caught until real numbers surfaced a genuinely
+absurd outlier (a "208 hour" game that was actually a normal ~3.5
+hour game) is that this field doesn't appear to reliably measure
+actual playing time. Most likely explanation: it's wall-clock time
+from when a scorekeeper opened the game console to whenever it got
+formally closed/finalized in CBL's system, not first-pitch-to-last-
+pitch -- so a game left open for days before being closed out
+produces a wildly wrong number, with no way to tell a genuinely long
+extra-innings game apart from a data artifact using anything in the
+payload.
+
+Rather than guess at a sanity-cap threshold (how long is "too long"
+for a real game? extra innings can legitimately run 4-5 hours), both
+features and the `gameday.get_game_duration_minutes()` parser they
+depended on are removed entirely rather than shipped with a
+band-aid filter. The parsing logic itself was correct -- this is a
+data reliability problem, not a bug in how the string was read.
+Worth remembering if `gameDuration` (or anything derived from it)
+ever comes up again: it needs real validation against known-good
+games before being trusted for aggregation, not just a working parser.
+
+
 ## New: Longest Games on Obscure Stats (13th category)
 
 Top 5 individual games by real-world duration, linking each one to
