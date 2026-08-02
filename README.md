@@ -1,5 +1,62 @@
 # CBL Stats
 
+## New: Longest Games on Obscure Stats (13th category)
+
+Top 5 individual games by real-world duration, linking each one to
+its own game page. Reuses the same confirmed-real `gameDuration`
+field and the same single full-schedule walk pattern as last
+session's "Most Hours of Baseball Played" team stat, just tracking
+one row per game instead of an accumulating per-team total.
+
+The obscure-stats page now handles a third row shape alongside the
+existing player-level and team-level ones -- a game-level row (no
+`playerId`, no `team`, a `gameId` instead) links to that game's own
+page rather than a player or team page.
+
+Tested with three constructed games of different durations: confirmed
+correct sort order (longest first), correct hour values, and correct
+"Away @ Home (date)" labels.
+
+
+## New: Total Hours Played (team obscure stat), and Batters to Watch swap-out on Broadcast Notes
+
+**Obscure Stats: GB/FB Ratio replaced with Total Hours of Baseball
+Played (team-level).** Confirmed real via a live payload someone
+pointed at directly -- `snapshot.setup.gameDuration` is a formatted
+"3h 19m" string. An earlier honest "I checked and couldn't find this
+anywhere" answer from a previous session was wrong, corrected once
+actual live data settled it. New `gameday.get_game_duration_minutes()`
+parses the confirmed format defensively (also handles hours-only or
+minutes-only in case a shorter game produces one of those, though only
+the "Xh Ym" shape has been directly confirmed). `obscure_stats.build_most_hours_played()`
+walks the full season schedule once, crediting BOTH teams in a game
+the full duration (a team is on the field the whole game regardless
+of which half they're batting), and skips any game with no parseable
+duration rather than counting it as zero. The obscure stats template
+now links team-level rows to the team roster page instead of a player
+page. Tested against hand-verified minute totals across multiple
+games and teams.
+
+**Broadcast Notes: Batters to Watch can now be swapped per slot,** not
+just left on auto. Each team gets 3 independent dropdowns (populated
+from that team's active roster via a new `/api/team/<name>/active-batters`
+endpoint, mirroring the existing pitcher-selection dropdown) --
+leaving a slot on "Auto" keeps that specific slot's OPS-leader pick,
+while overriding one slot doesn't disturb the other two. If an
+auto-picked player would land in an already-explicitly-filled slot,
+they're skipped rather than shown twice. `team_schedule.get_active_roster_pitchers`
+was generalized into a broader `get_active_roster_players()` (any
+position, not just "P") with the pitcher-only version now a thin
+wrapper over it, reusing the shared `transactions.filter_active_players`
+utility instead of re-implementing the off-roster check inline.
+Tested the per-slot override logic directly (a single-slot override
+correctly replaces just that slot, auto-fills the other two without
+duplicating), and confirmed end-to-end that an override actually shows
+up correctly in the rendered PDF text, including the placeholder-stats
+fallback for a manually-selected player with no season stat line yet
+(e.g. a recent call-up).
+
+
 ## New: Magic Number / Elimination Number on the Teams standings
 
 Added a "Magic #" column to the standings table on the Teams page --

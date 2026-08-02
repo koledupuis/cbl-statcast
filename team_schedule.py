@@ -98,36 +98,35 @@ def _team_side(g, team_name):
     return "home" if gamelog._normalize(home) == gamelog._normalize(team_name) else "away"
 
 
-def get_active_roster_pitchers(team_name, season_year=None):
-    """Pitchers on `team_name`'s active roster right now -- CBL doesn't
-    expose a dedicated "current roster" endpoint, so this uses the
-    closest real proxy: the roster CBL itself attached to the team's
-    MOST RECENT game (gamelog.team_games already sorts ascending by
-    date, so the last entry is the most recent). That roster reflects
-    who was actually eligible/rostered as of the last time this team
-    played -- naturally excludes anyone who's since been released or
-    left, and includes anyone recently added, unlike season stat rows
-    (which persist all season regardless of current roster status).
+def get_active_roster_players(team_name, position=None, season_year=None):
+    """Players on `team_name`'s active roster right now, optionally
+    filtered to one position code (e.g. "P" for pitchers) -- CBL
+    doesn't expose a dedicated "current roster" endpoint, so this uses
+    the closest real proxy: the roster CBL itself attached to the
+    team's MOST RECENT game (gamelog.team_games already sorts
+    ascending by date, so the last entry is the most recent). That
+    roster reflects who was actually eligible/rostered as of the last
+    time this team played -- naturally excludes anyone who's since
+    been released or left, and includes anyone recently added, unlike
+    season stat rows (which persist all season regardless of current
+    roster status).
 
     Also cross-checked against CBL's own transaction log (see
-    transactions.py) as a safety net: a pitcher is excluded here if
-    their most recent logged transaction shows them released,
-    inactive, injured, traded away, or traded out of the league
-    entirely -- even if they were still on the roster as of their last
-    game (e.g. released the day after). This match is by NAME (the
-    transaction feed has no player ID), case-insensitive and exact
-    only -- a name that doesn't match anything in the transaction feed
-    just isn't filtered, never incorrectly removed; a failed or empty
-    transaction fetch degrades to "no extra filtering" the same way,
-    never to an empty roster.
+    transactions.filter_active_players) as a safety net: a player is
+    excluded here if their most recent logged transaction shows them
+    released, inactive, injured, traded away, or traded out of the
+    league entirely -- even if they were still on the roster as of
+    their last game (e.g. released the day after). Matched by NAME
+    (the transaction feed has no player ID); a name with no match in
+    the transaction feed is kept, never incorrectly removed, and a
+    failed transaction fetch degrades to "no extra filtering", never
+    to an empty roster.
 
-    Returns a list of {"id", "name"} dicts, sorted by name, filtered to
-    roster entries whose listed position is "P". Empty list if the team
-    has no games on record yet, or the most recent game's roster data
-    isn't available for any reason -- never guesses at roster
-    membership from season stats as a fallback, since a player with a
-    pitching stat line from April isn't necessarily still on the team
-    in July."""
+    Returns a list of {"id", "name"} dicts, sorted by name. Empty list
+    if the team has no games on record yet, or the most recent game's
+    roster data isn't available for any reason -- never guesses at
+    roster membership from season stats as a fallback, since a stat
+    line from April doesn't mean someone's still on the team in July."""
     games = list(gamelog.team_games(team_name, season_year))
     if not games:
         return []
@@ -144,26 +143,22 @@ def get_active_roster_pitchers(team_name, season_year=None):
 
     side_key = "homeTeam" if _team_side(most_recent, team_name) == "home" else "awayTeam"
     roster = (gd["snapshot"].get(side_key) or {}).get("roster") or []
-    pitchers = [
+    players = [
         {"id": p.get("id"), "name": p.get("name")}
-        for p in roster if (p.get("position") or "").strip().upper() == "P" and p.get("id") and p.get("name")
+        for p in roster
+        if p.get("id") and p.get("name")
+        and (position is None or (p.get("position") or "").strip().upper() == position.upper())
     ]
 
-    off_roster_statuses = {
-        transactions.STATUS_RELEASED, transactions.STATUS_INACTIVE, transactions.STATUS_INJURED,
-        transactions.STATUS_TRADED_AWAY, transactions.STATUS_LEFT_LEAGUE,
-    }
-    try:
-        tx_status = transactions.build_roster_status(season_year)
-    except Exception:
-        tx_status = {}
-    if tx_status:
-        pitchers = [
-            p for p in pitchers
-            if (tx_status.get(p["name"].strip().lower()) or {}).get("status") not in off_roster_statuses
-        ]
+    players = transactions.filter_active_players(players, name_key="name", season_year=season_year)
+    return sorted(players, key=lambda p: p["name"].lower())
 
-    return sorted(pitchers, key=lambda p: p["name"].lower())
+
+def get_active_roster_pitchers(team_name, season_year=None):
+    """Pitchers on `team_name`'s active roster right now -- thin
+    wrapper over get_active_roster_players(position="P"); kept as its
+    own name since it's what every existing caller already uses."""
+    return get_active_roster_players(team_name, position="P", season_year=season_year)
 
 
 def build_team_season_record(team_name, season_year=None):

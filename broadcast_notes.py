@@ -274,6 +274,35 @@ def _pitcher_row_for_starter(all_pitching, team_name, starting_pitcher_id):
     }
 
 
+def _batter_row_for_id(all_batting, team_name, batter_id):
+    """Season stat row for one specific, explicitly-selected batter --
+    used to override a single slot in _ops_leaders' auto-picked
+    Batters to Watch list, the same idea as _pitcher_row_for_starter
+    just above but for a batting slot instead of the starting pitcher.
+
+    Falls back to a placeholder row (zero stats, name resolved from
+    the active roster rather than season stats) if this batter hasn't
+    recorded a plate appearance yet this season -- a real, possible
+    case for e.g. a recent call-up -- rather than silently dropping
+    the person the operator specifically asked for."""
+    for r in all_batting:
+        if r.get("playerId") == batter_id:
+            return r
+    name = None
+    try:
+        for p in team_schedule.get_active_roster_players(team_name):
+            if p.get("id") == batter_id:
+                name = p.get("name")
+                break
+    except Exception:
+        pass
+    return {
+        "playerId": batter_id, "teamName": team_name, "fullName": name,
+        "battingAvg": None, "obp": None, "slg": None, "ops": None,
+        "homeRuns": 0, "rbi": 0, "plateAppearances": 0,
+    }
+
+
 def _fmt_batting_line(g):
     """'2-4, HR, 2 RBI' style summary of one game's batting line, or
     '--' if there's no game to summarize. Only calls out extra-base
@@ -635,7 +664,8 @@ def _head_to_head(team_a_record, team_b_name):
     return {"games": len(games), "team_a_wins": a_wins, "team_b_wins": len(games) - a_wins, "results": games}
 
 
-def build_matchup_notes(team_a_name, team_b_name, pitcher_a_id=None, pitcher_b_id=None):
+def build_matchup_notes(team_a_name, team_b_name, pitcher_a_id=None, pitcher_b_id=None,
+                         batter_ids_a=None, batter_ids_b=None):
     """Gathers everything the PDF needs for a Team A vs Team B matchup.
 
     pitcher_a_id / pitcher_b_id: optional explicit starting-pitcher
@@ -644,7 +674,17 @@ def build_matchup_notes(team_a_name, team_b_name, pitcher_a_id=None, pitcher_b_i
     entirely for that team's "Pitchers to Watch" section, rather than
     being added alongside it, since an ERA leader who isn't even
     pitching today isn't what a broadcast operator needs on this
-    sheet."""
+    sheet.
+
+    batter_ids_a / batter_ids_b: optional list of up to 3 explicit
+    batter selections (each a player ID from that team's active
+    roster, or None/empty to leave that specific slot on auto) --
+    per-SLOT override of _ops_leaders' auto-picked Batters to Watch,
+    not an all-or-nothing swap: a broadcast operator can override just
+    slot 2 while leaving slots 1 and 3 on their auto OPS-leader picks.
+    Any auto-picked player who'd otherwise land in a slot but is
+    already explicitly selected for a different slot is skipped, so
+    the same name never appears twice in the same team's list."""
     all_batting = cbl_api.get_batting()
     all_pitching = cbl_api.get_pitching()
     pitching_ctx = analytics.league_pitching_context(all_pitching)
@@ -667,7 +707,7 @@ def build_matchup_notes(team_a_name, team_b_name, pitcher_a_id=None, pitcher_b_i
     except Exception:
         standings = []
 
-    def team_bundle(team_name, other_team_name, starting_pitcher_id=None):
+    def team_bundle(team_name, other_team_name, starting_pitcher_id=None, batter_slot_ids=None):
         try:
             record = team_schedule.build_team_season_record(team_name)
         except Exception:
@@ -683,8 +723,24 @@ def build_matchup_notes(team_a_name, team_b_name, pitcher_a_id=None, pitcher_b_i
                 ctx = _pitcher_recent_context(p.get("playerId"), team_name)
                 pitchers.append({"row": p, "streak": ctx["streak"], "last_game": ctx["last_game"],
                                   "days_rest": _days_since(ctx["last_game"]["date"]) if ctx["last_game"] else None})
+
+        # Resolve the 3 Batters to Watch slots: an explicit ID for a
+        # slot wins outright; an empty/None slot pulls the next
+        # not-already-explicitly-used name off the auto OPS-leader
+        # list, so overriding one slot doesn't disturb the other two.
+        batter_slot_ids = (batter_slot_ids or [None, None, None])[:TOP_BATTERS_SHOWN]
+        explicit_ids = {bid for bid in batter_slot_ids if bid}
+        auto_pool = iter(r for r in _ops_leaders(all_batting, team_name) if r.get("playerId") not in explicit_ids)
+        batter_rows = []
+        for slot_id in batter_slot_ids:
+            if slot_id:
+                batter_rows.append(_batter_row_for_id(all_batting, team_name, slot_id))
+            else:
+                auto_pick = next(auto_pool, None)
+                if auto_pick:
+                    batter_rows.append(auto_pick)
         batters = []
-        for r in _ops_leaders(all_batting, team_name):
+        for r in batter_rows:
             ctx = _batter_recent_context(r.get("playerId"), team_name)
             batters.append({
                 "row": r, "last_game": ctx["last_game"], "hit_streak": ctx["hit_streak"],
@@ -720,8 +776,8 @@ def build_matchup_notes(team_a_name, team_b_name, pitcher_a_id=None, pitcher_b_i
             "bullpen_availability": bullpen_availability,
         }
 
-    team_a = team_bundle(team_a_name, team_b_name, starting_pitcher_id=pitcher_a_id)
-    team_b = team_bundle(team_b_name, team_a_name, starting_pitcher_id=pitcher_b_id)
+    team_a = team_bundle(team_a_name, team_b_name, starting_pitcher_id=pitcher_a_id, batter_slot_ids=batter_ids_a)
+    team_b = team_bundle(team_b_name, team_a_name, starting_pitcher_id=pitcher_b_id, batter_slot_ids=batter_ids_b)
 
     generated = date.today()
     return {"team_a": team_a, "team_b": team_b,

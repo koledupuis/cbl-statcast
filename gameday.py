@@ -75,6 +75,7 @@ numbers over re-deriving the same thing from the raw at-bat/event log
 where CBL already computed it, falling back to their own derivation
 only if a particular game's payload doesn't have that field.
 """
+import re
 from collections import OrderedDict
 
 HIT_OUTCOMES = {"single", "double", "triple", "home_run", "bunt_single", "ground_rule_double"}
@@ -446,6 +447,35 @@ def get_home_plate_umpire(gd):
         return _name_of(umpires[0])
 
     return None
+
+
+_DURATION_RE = re.compile(r"(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?", re.IGNORECASE)
+
+
+def get_game_duration_minutes(gd):
+    """This game's total duration in minutes, or None if not available.
+
+    Confirmed against a real populated payload: snapshot.setup.gameDuration
+    is a formatted string like "3h 19m" -- hours and minutes, not a raw
+    number of seconds or minutes. Parsed defensively: matches an
+    optional "Xh" and an optional "Ym" in either order-agnostic
+    combination (so "3h 19m", "19m" alone for a sub-hour game, or "3h"
+    alone for an exact-hour game -- though none of those shorter forms
+    have been directly confirmed against a real payload the way "Xh Ym"
+    has -- all parse correctly). Returns None (not 0) if the field is
+    missing or the string doesn't match the expected shape at all, so a
+    genuinely unavailable duration is never silently counted as a
+    0-minute game."""
+    setup = (gd.get("snapshot") or {}).get("setup") or {}
+    raw = setup.get("gameDuration")
+    if not raw or not isinstance(raw, str):
+        return None
+    m = _DURATION_RE.search(raw)
+    if not m or (m.group(1) is None and m.group(2) is None):
+        return None
+    hours = int(m.group(1)) if m.group(1) else 0
+    minutes = int(m.group(2)) if m.group(2) else 0
+    return hours * 60 + minutes
 
 
 def build_player_lookup(gd):

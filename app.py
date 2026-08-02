@@ -414,7 +414,13 @@ def export_broadcast_notes():
     pitcher_a = (request.args.get("pitcherA") or "").strip() or None
     pitcher_b = (request.args.get("pitcherB") or "").strip() or None
 
-    matchup = broadcast_notes.build_matchup_notes(team_a, team_b, pitcher_a_id=pitcher_a, pitcher_b_id=pitcher_b)
+    def batter_slots(prefix):
+        return [(request.args.get(f"{prefix}{i}") or "").strip() or None for i in (1, 2, 3)]
+
+    matchup = broadcast_notes.build_matchup_notes(
+        team_a, team_b, pitcher_a_id=pitcher_a, pitcher_b_id=pitcher_b,
+        batter_ids_a=batter_slots("batterA"), batter_ids_b=batter_slots("batterB"),
+    )
     pdf_buf = broadcast_notes.render_pdf(matchup)
 
     safe_a = "".join(c for c in team_a if c.isalnum() or c in " -_").strip().replace(" ", "-")
@@ -878,6 +884,20 @@ def api_team_active_pitchers(team_name):
     except Exception:
         pitchers = []
     return jsonify({"pitchers": pitchers})
+
+
+@app.route("/api/team/<team_name>/active-batters")
+def api_team_active_batters(team_name):
+    """{"batters": [{"id":..., "name":...}, ...]}
+    Powers the broadcast notes form's Batters to Watch swap-out
+    dropdowns -- same active-roster scoping as active-pitchers above
+    (see team_schedule.get_active_roster_players), just without the
+    position filter, since a batter to watch could be any position."""
+    try:
+        batters = team_schedule.get_active_roster_players(team_name)
+    except Exception:
+        batters = []
+    return jsonify({"batters": batters})
 
 
 @app.route("/api/player/<player_id>")

@@ -83,6 +83,20 @@
   <select name="pitcherA" id="pitcherA-select" disabled style="font-family:'JetBrains Mono',monospace; font-weight:500; background:rgba(0,0,0,0.04); border:1px solid var(--paper-line); color:var(--ink); padding:8px 10px; font-size:13px; min-width:170px;">
     <option value="">Auto (Team A ERA leader)</option>
   </select>
+
+  <div style="flex-basis:100%; height:0;"></div>
+  <span style="font-size:11px; color:var(--ink-soft); letter-spacing:0.05em; text-transform:uppercase; min-width:0;">Batters to watch (A):</span>
+  <select name="batterA1" id="batterA1-select" disabled style="font-family:'JetBrains Mono',monospace; font-weight:500; background:rgba(0,0,0,0.04); border:1px solid var(--paper-line); color:var(--ink); padding:8px 10px; font-size:13px; min-width:160px;">
+    <option value="">Auto (slot 1)</option>
+  </select>
+  <select name="batterA2" id="batterA2-select" disabled style="font-family:'JetBrains Mono',monospace; font-weight:500; background:rgba(0,0,0,0.04); border:1px solid var(--paper-line); color:var(--ink); padding:8px 10px; font-size:13px; min-width:160px;">
+    <option value="">Auto (slot 2)</option>
+  </select>
+  <select name="batterA3" id="batterA3-select" disabled style="font-family:'JetBrains Mono',monospace; font-weight:500; background:rgba(0,0,0,0.04); border:1px solid var(--paper-line); color:var(--ink); padding:8px 10px; font-size:13px; min-width:160px;">
+    <option value="">Auto (slot 3)</option>
+  </select>
+
+  <div style="flex-basis:100%; height:12px;"></div>
   <select name="teamB" id="teamB-select" required style="font-family:'JetBrains Mono',monospace; font-weight:500; background:rgba(0,0,0,0.04); border:1px solid var(--paper-line); color:var(--ink); padding:8px 10px; font-size:13px;">
     <option value="">Team B&hellip;</option>
     {% for t in team_search_list %}
@@ -92,13 +106,29 @@
   <select name="pitcherB" id="pitcherB-select" disabled style="font-family:'JetBrains Mono',monospace; font-weight:500; background:rgba(0,0,0,0.04); border:1px solid var(--paper-line); color:var(--ink); padding:8px 10px; font-size:13px; min-width:170px;">
     <option value="">Auto (Team B ERA leader)</option>
   </select>
+
+  <div style="flex-basis:100%; height:0;"></div>
+  <span style="font-size:11px; color:var(--ink-soft); letter-spacing:0.05em; text-transform:uppercase; min-width:0;">Batters to watch (B):</span>
+  <select name="batterB1" id="batterB1-select" disabled style="font-family:'JetBrains Mono',monospace; font-weight:500; background:rgba(0,0,0,0.04); border:1px solid var(--paper-line); color:var(--ink); padding:8px 10px; font-size:13px; min-width:160px;">
+    <option value="">Auto (slot 1)</option>
+  </select>
+  <select name="batterB2" id="batterB2-select" disabled style="font-family:'JetBrains Mono',monospace; font-weight:500; background:rgba(0,0,0,0.04); border:1px solid var(--paper-line); color:var(--ink); padding:8px 10px; font-size:13px; min-width:160px;">
+    <option value="">Auto (slot 2)</option>
+  </select>
+  <select name="batterB3" id="batterB3-select" disabled style="font-family:'JetBrains Mono',monospace; font-weight:500; background:rgba(0,0,0,0.04); border:1px solid var(--paper-line); color:var(--ink); padding:8px 10px; font-size:13px; min-width:160px;">
+    <option value="">Auto (slot 3)</option>
+  </select>
+
+  <div style="flex-basis:100%; height:12px;"></div>
   <button type="submit" class="insert-btn" style="padding:8px 16px; font-size:13px;">Download PDF</button>
 </form>
 <div class="note" style="margin-top:14px;">
-  Starting pitcher dropdowns are scoped to that team's <b>active roster</b> (whoever was actually
-  rostered for their most recent game, not just anyone with a stat line from earlier this season) --
-  they populate once you pick a team. Leave a pitcher on "Auto" to fall back to that team's season ERA
-  leader instead, same as before.
+  Starting pitcher and Batters to Watch dropdowns are both scoped to that team's <b>active roster</b>
+  (whoever was actually rostered for their most recent game, not just anyone with a stat line from
+  earlier this season) -- they populate once you pick a team. Leave a pitcher on "Auto" to fall back to
+  that team's season ERA leader; leave any batter slot on "Auto" to fall back to that team's season OPS
+  leaderboard for that specific slot -- overriding one slot doesn't disturb the other two, and the same
+  player is never auto-picked into a second slot if you've already put them in another one by hand.
 </div>
 <script>
 (function () {
@@ -121,13 +151,45 @@
     pitcherSelectEl.disabled = false;
   }
 
+  async function loadBatters(teamName, batterSelectEls) {
+    batterSelectEls.forEach((el, i) => {
+      el.disabled = true;
+      el.innerHTML = `<option value="">Auto (slot ${i + 1})</option>`;
+    });
+    if (!teamName) return;
+    batterSelectEls.forEach(el => { el.innerHTML = `<option value="">Loading roster&hellip;</option>`; });
+    let batters = [];
+    try {
+      const resp = await fetch(`/api/team/${encodeURIComponent(teamName)}/active-batters`);
+      const data = await resp.json();
+      batters = data.batters || [];
+    } catch (e) {
+      batters = [];
+    }
+    batterSelectEls.forEach((el, i) => {
+      let opts = `<option value="">Auto (slot ${i + 1})</option>`;
+      opts += batters.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+      if (!batters.length) opts += `<option value="" disabled>No batters found on active roster</option>`;
+      el.innerHTML = opts;
+      el.disabled = false;
+    });
+  }
+
   const teamASelect = document.getElementById('teamA-select');
   const teamBSelect = document.getElementById('teamB-select');
   const pitcherASelect = document.getElementById('pitcherA-select');
   const pitcherBSelect = document.getElementById('pitcherB-select');
+  const batterASelects = ['batterA1-select', 'batterA2-select', 'batterA3-select'].map(id => document.getElementById(id));
+  const batterBSelects = ['batterB1-select', 'batterB2-select', 'batterB3-select'].map(id => document.getElementById(id));
 
-  teamASelect.addEventListener('change', () => loadPitchers(teamASelect.value, pitcherASelect, 'Auto (Team A ERA leader)'));
-  teamBSelect.addEventListener('change', () => loadPitchers(teamBSelect.value, pitcherBSelect, 'Auto (Team B ERA leader)'));
+  teamASelect.addEventListener('change', () => {
+    loadPitchers(teamASelect.value, pitcherASelect, 'Auto (Team A ERA leader)');
+    loadBatters(teamASelect.value, batterASelects);
+  });
+  teamBSelect.addEventListener('change', () => {
+    loadPitchers(teamBSelect.value, pitcherBSelect, 'Auto (Team B ERA leader)');
+    loadBatters(teamBSelect.value, batterBSelects);
+  });
 })();
 </script>
 <div class="note" style="margin-top:14px;">
