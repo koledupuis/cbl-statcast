@@ -347,6 +347,30 @@ def _current_streak(game_results):
 MIN_GAMES_FOR_UMPIRE_ROW = 1  # every umpire who's worked at least one game shows -- no meaningful "too small" cutoff at the team level
 
 
+def head_to_head_record(team_a_record, team_b_name):
+    """This season's head-to-head record between two teams, from team
+    A's own perspective -- takes team A's already-built
+    build_team_season_record() output and filters its game_results
+    down to games against team B specifically.
+
+    Returns None if team_a_record itself is missing/empty; returns
+    {"games": 0, "team_a_wins": 0, "team_b_wins": 0, "results": []} if
+    the two teams simply haven't played each other yet (a real,
+    common case early in a season, distinct from missing data).
+
+    Shared utility -- originally a private, PDF-only helper in
+    broadcast_notes.py; moved here so betting_odds.py's own head-to-
+    head adjustment can use the exact same logic instead of a second
+    copy."""
+    if not team_a_record or not team_a_record.get("game_results"):
+        return None
+    games = [g for g in team_a_record["game_results"] if g["opponent"] == team_b_name]
+    if not games:
+        return {"games": 0, "team_a_wins": 0, "team_b_wins": 0, "results": []}
+    a_wins = sum(1 for g in games if g["result"] == "W")
+    return {"games": len(games), "team_a_wins": a_wins, "team_b_wins": len(games) - a_wins, "results": games}
+
+
 def build_umpire_record(game_results):
     """This team's win/loss record broken out by home plate umpire --
     takes the game_results list build_team_season_record already

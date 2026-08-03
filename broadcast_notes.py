@@ -654,16 +654,6 @@ def build_pitcher_deep_dive(row, team_name):
     }
 
 
-def _head_to_head(team_a_record, team_b_name):
-    if not team_a_record or not team_a_record.get("game_results"):
-        return None
-    games = [g for g in team_a_record["game_results"] if g["opponent"] == team_b_name]
-    if not games:
-        return {"games": 0, "team_a_wins": 0, "team_b_wins": 0, "results": []}
-    a_wins = sum(1 for g in games if g["result"] == "W")
-    return {"games": len(games), "team_a_wins": a_wins, "team_b_wins": len(games) - a_wins, "results": games}
-
-
 def build_matchup_notes(team_a_name, team_b_name, pitcher_a_id=None, pitcher_b_id=None,
                          batter_ids_a=None, batter_ids_b=None):
     """Gathers everything the PDF needs for a Team A vs Team B matchup.
@@ -764,7 +754,7 @@ def build_matchup_notes(team_a_name, team_b_name, pitcher_a_id=None, pitcher_b_i
             "pitchers_to_watch": pitchers,
             "starter_deep_dive": deep_dive,
             "has_selected_starter": bool(starting_pitcher_id),
-            "head_to_head": _head_to_head(record, other_team_name),
+            "head_to_head": team_schedule.head_to_head_record(record, other_team_name),
             "leaders": {
                 "hr": _stat_leader(all_batting, team_name, "homeRuns"),
                 "rbi": _stat_leader(all_batting, team_name, "rbi"),

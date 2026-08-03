@@ -195,14 +195,81 @@ def log5_win_probability(team_a_pyth_pct, team_b_pyth_pct):
 
 
 def apply_home_field(prob_home_before_adjustment, home_field_win_pct):
-    """Nudges a pre-home-field win probability toward the league's own
-    derived (or fallback) home-field rate -- a simple blend (average
-    of the Log5 estimate and the league's overall home-team win rate)
-    rather than a more elaborate model, since with a 48-game season
-    there isn't enough data to responsibly fit anything more precise
-    than "the true number is probably somewhere between team strength
-    alone and the league's overall home-field tendency."""
-    return (prob_home_before_adjustment + home_field_win_pct) / 2
+    """Nudges a pre-home-field win probability by the league's own
+    derived (or fallback) home-field tendency -- an ADDITIVE shift
+    (the home-field rate's deviation from a flat 50%), not a 50/50
+    blend with the raw Log5 estimate. A blend was the original
+    approach here, and it was a real bug: averaging a strong team-
+    strength signal (say Log5 saying a team is a 70% favorite) with an
+    independent number that's naturally close to 50% (the league's
+    overall home-field rate) cuts the signal's deviation from a coin
+    flip roughly in half every time -- a 70% favorite would show as
+    just 60%, regardless of how lopsided the real talent gap actually
+    is. Shifting additively by the home-field deviation instead (a
+    league that's 53% home-favorable adds +3 points, not a wholesale
+    average) preserves the actual team-strength signal, which is the
+    whole point of a matchup page like this."""
+    return min(max(prob_home_before_adjustment + (home_field_win_pct - 0.5), 0.01), 0.99)
+
+
+MIN_H2H_GAMES_FOR_ANY_WEIGHT = 1  # a single meeting still gets SOME weight, just a small one
+H2H_MAX_WEIGHT = 0.30  # even with many meetings, head-to-head can shift the estimate by at most this fraction of its own deviation from 50%
+H2H_WEIGHT_SCALE = 10  # games-to-reach-roughly-half-of-H2H_MAX_WEIGHT -- a regression-to-the-mean constant, not derived from real data (there isn't enough within-season H2H volume in a 48-game schedule to fit this properly)
+
+
+def apply_head_to_head(prob_home_before_adjustment, h2h):
+    """Nudges a pre-head-to-head win probability toward how the home
+    team has actually done against THIS SPECIFIC opponent this season
+    -- also an additive shift, same reasoning as apply_home_field
+    (preserve the underlying signal rather than blend it away), but
+    weighted down significantly since a season's worth of head-to-head
+    meetings between two specific teams is a much smaller, noisier
+    sample than either team's full season record. A 2-0 season series
+    is real information, but it's nowhere near as reliable as a
+    team's full 30-game Pythagorean record, so this can only nudge the
+    estimate by a modest amount at most (H2H_MAX_WEIGHT), and that
+    weight itself scales up gradually with how many times they've
+    actually met (H2H_WEIGHT_SCALE) rather than snapping to full
+    weight after just one or two games.
+
+    No adjustment (returned unchanged) if h2h is missing/None or the
+    two teams haven't played each other yet this season -- "no data"
+    is not the same as "they're evenly matched head-to-head," so this
+    correctly does nothing rather than assume 50/50."""
+    if not h2h or not h2h.get("games"):
+        return prob_home_before_adjustment
+    games = h2h["games"]
+    h2h_home_win_pct = h2h["team_a_wins"] / games
+    weight = H2H_MAX_WEIGHT * (games / (games + H2H_WEIGHT_SCALE))
+    shift = (h2h_home_win_pct - 0.5) * weight
+    return min(max(prob_home_before_adjustment + shift, 0.01), 0.99)
+
+
+# Target combined implied probability after odds are shown -- what a
+# real sportsbook's vig/juice looks like. A "true" 50/50 game doesn't
+# get shown as +100/+100 on a real book; it gets shown as something
+# like -110/-110 (52.4% + 52.4% = ~104.8% combined). FanDuel's actual
+# vig varies by market and moves over time, so this is a reasonable
+# representative number for a mainline moneyline/spread/total, not a
+# live-scraped figure from FanDuel itself -- there's no way to keep
+# this exactly in sync with a real book's current pricing, and this
+# app doesn't try to.
+VIG_TARGET = 1.045
+
+
+def apply_vig(prob_a, prob_b, target_overround=VIG_TARGET):
+    """Scales two complementary true probabilities up so they sum to
+    target_overround instead of exactly 1.0 -- what turns a "true"
+    modeled 50/50 into a realistic-looking -110/-110 line instead of
+    an unrealistic +100/+100. Scaling proportionally (not adding a
+    flat amount to each side) keeps the ratio between favorite and
+    underdog intact -- a big favorite stays a big favorite, just
+    priced the way a real book would price it."""
+    total = prob_a + prob_b
+    if total <= 0:
+        return prob_a, prob_b
+    scale = target_overround / total
+    return prob_a * scale, prob_b * scale
 
 
 def prob_to_american_odds(p):
@@ -291,7 +358,10 @@ def build_daily_odds(target_date, season_year=None):
         from the one already-fetched season record -- cached per team
         name so a team appearing in multiple of today's games (not
         possible in a normal single-game-per-day schedule, but a safe
-        guard regardless) doesn't refetch."""
+        guard regardless) doesn't refetch. Keeps the full record too
+        (not just the derived numbers), since apply_head_to_head needs
+        the home team's own game_results to look up meetings against
+        today's specific opponent."""
         if team_name not in team_cache:
             try:
                 record = team_schedule.build_team_season_record(team_name, season_year)
@@ -302,7 +372,9 @@ def build_daily_odds(target_date, season_year=None):
             pyth = record.get("pythagorean_win_pct")
             rpg_scored = (record.get("runs_scored") / games_played) if games_played else None
             rpg_allowed = (record.get("runs_allowed") / games_played) if games_played else None
-            team_cache[team_name] = {"pyth": pyth, "rpg_scored": rpg_scored, "rpg_allowed": rpg_allowed}
+            team_cache[team_name] = {
+                "pyth": pyth, "rpg_scored": rpg_scored, "rpg_allowed": rpg_allowed, "record": record,
+            }
         return team_cache[team_name]
 
     results = []
@@ -317,14 +389,23 @@ def build_daily_odds(target_date, season_year=None):
 
         raw_home_prob = log5_win_probability(home_info["pyth"], away_info["pyth"])
         home_prob = apply_home_field(raw_home_prob, home_field["win_pct"])
+        h2h = team_schedule.head_to_head_record(home_info["record"], away)
+        home_prob = apply_head_to_head(home_prob, h2h)
         away_prob = 1 - home_prob
+        # Vig is applied only to the ODDS shown, not to the win% --
+        # the win% column stays the model's honest true estimate;
+        # the odds column is what actually gets displayed as a price,
+        # same separation a real sportsbook makes between its internal
+        # number and what it posts.
+        home_vig_prob, away_vig_prob = apply_vig(home_prob, away_prob)
 
         row = {
             "home_team": home, "away_team": away,
             "home_pythagorean": home_info["pyth"], "away_pythagorean": away_info["pyth"],
+            "head_to_head": h2h,
             "home_win_pct": home_prob, "away_win_pct": away_prob,
-            "home_odds": prob_to_american_odds(home_prob),
-            "away_odds": prob_to_american_odds(away_prob),
+            "home_odds": prob_to_american_odds(home_vig_prob),
+            "away_odds": prob_to_american_odds(away_vig_prob),
         }
 
         # Run line + total: needs both teams' runs-per-game on record,
@@ -341,20 +422,22 @@ def build_daily_odds(target_date, season_year=None):
             run_line = round_to_half(-expected_margin)  # e.g. home favored by 3 -> line of -2.5 or -3.5
             home_cover_prob = run_line_probability(expected_margin, run_stats["diff_stdev"], run_line)
             away_cover_prob = 1 - home_cover_prob
+            home_cover_vig, away_cover_vig = apply_vig(home_cover_prob, away_cover_prob)
 
             total_line = round_to_half(expected_total)
             over_prob = total_runs_probability(expected_total, run_stats["total_stdev"], total_line)
             under_prob = 1 - over_prob
+            over_vig, under_vig = apply_vig(over_prob, under_prob)
 
             row.update({
                 "run_line": run_line,
                 "home_cover_prob": home_cover_prob, "away_cover_prob": away_cover_prob,
-                "home_cover_odds": prob_to_american_odds(home_cover_prob),
-                "away_cover_odds": prob_to_american_odds(away_cover_prob),
+                "home_cover_odds": prob_to_american_odds(home_cover_vig),
+                "away_cover_odds": prob_to_american_odds(away_cover_vig),
                 "total_line": total_line,
                 "over_prob": over_prob, "under_prob": under_prob,
-                "over_odds": prob_to_american_odds(over_prob),
-                "under_odds": prob_to_american_odds(under_prob),
+                "over_odds": prob_to_american_odds(over_vig),
+                "under_odds": prob_to_american_odds(under_vig),
             })
 
         results.append(row)
