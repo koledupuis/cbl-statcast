@@ -71,6 +71,32 @@ def get_game_ids(season_year=None):
     return data
 
 
+SCHEDULE_TTL = int(os.environ.get("CBL_SCHEDULE_TTL", "300"))
+
+
+def get_schedule(season_year=None):
+    """The league's full game-by-game schedule -- confirmed real via a
+    live payload (not previously used anywhere in this app). Distinct
+    from get_game_ids above: this one has a confirmed, real "status"
+    field with values actually seen in a live response ("scheduled",
+    "postponed" both confirmed; presumably "completed" too for played
+    games, though that specific value wasn't directly seen in the
+    portion of a real response inspected so far) -- get_game_ids was
+    never confirmed to include not-yet-played games at all, which was
+    the root cause of a real bug (the /betting page showing no games
+    for a future date) traced to this exact gap.
+
+    Each entry nests team info as {"teamId","name",...} under
+    "homeTeam"/"awayTeam", unlike get_game_ids' flatter shape --
+    callers need to reach one level deeper for the team name."""
+    season_year = season_year or DEFAULT_SEASON_YEAR
+    url = f"{BASE_URL}/schedule"
+    data = _cached_get(url, {"season": season_year}, f"schedule:{season_year}", ttl=SCHEDULE_TTL)
+    if isinstance(data, dict):
+        return data.get("games") or []
+    return data if isinstance(data, list) else []
+
+
 GAMEDAY_LIVE_TTL = int(os.environ.get("CBL_GAMEDAY_LIVE_TTL", "20"))
 GAMEDAY_FINAL_TTL = int(os.environ.get("CBL_GAMEDAY_FINAL_TTL", "3600"))
 

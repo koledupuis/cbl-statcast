@@ -220,23 +220,32 @@ def prob_to_american_odds(p):
 
 
 def _games_on_date(target_date, season_year=None):
-    """Every game on record for target_date (YYYY-MM-DD string) that
-    is NOT marked "completed" -- deliberately an exclusion filter
-    rather than checking for a specific "scheduled"/"upcoming" status
-    string, since this codebase has only ever confirmed what
-    "completed" looks like in this feed, not the exact spelling CBL
-    uses for a not-yet-played game. Excluding "completed" is the safe
-    direction to get this right without guessing at an unconfirmed
-    status value."""
-    all_games = cbl_api.get_game_ids(season_year)
+    """Every game scheduled for target_date (YYYY-MM-DD string) that
+    hasn't been played yet -- uses cbl_api.get_schedule (the real
+    schedule feed, confirmed via a live payload to use "scheduled" as
+    its actual not-yet-played status, and "postponed" for a
+    rained-out game) rather than the game-ids feed this app uses
+    everywhere else, which was never confirmed to include not-yet-
+    played games at all -- that gap was the root cause of a real bug
+    (the /betting page showing no games for a future date).
+
+    Returns entries normalized to the flat {"homeTeam","awayTeam",...}
+    shape the rest of build_daily_odds already expects (the schedule
+    feed itself nests team info as {"name":...} under "homeTeam"/
+    "awayTeam" -- unpacked here so nothing downstream needs to know
+    the two feeds shape team names differently)."""
+    all_games = cbl_api.get_schedule(season_year)
     if not isinstance(all_games, list):
         return []
     matches = []
     for g in all_games:
-        date = gamelog._field(g, "gameDate", "game_date", "game-date", default="")
-        status = gamelog._field(g, "status", default="")
-        if date == target_date and status != "completed":
-            matches.append(g)
+        if g.get("date") != target_date or g.get("status") != "scheduled":
+            continue
+        home = (g.get("homeTeam") or {}).get("name")
+        away = (g.get("awayTeam") or {}).get("name")
+        if not home or not away:
+            continue
+        matches.append({"homeTeam": home, "awayTeam": away, "gameDate": g.get("date")})
     return matches
 
 
