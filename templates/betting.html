@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Modeled Odds &middot; CBL Stats{% endblock %}
+
+{% block content %}
+<div class="section-title">Modeled Win Probabilities</div>
+<div class="section-sub">{{ target_date }} &middot; NOT real betting odds &mdash; see disclaimer below</div>
+
+<form method="get" style="display:flex; gap:10px; align-items:center; margin-top:10px; margin-bottom:16px;">
+  <input type="date" name="date" value="{{ target_date }}"
+         style="font-family:'JetBrains Mono',monospace; background:rgba(0,0,0,0.04); border:1px solid var(--paper-line); color:var(--ink); padding:8px 10px; font-size:13px;">
+  <button type="submit" class="insert-btn" style="padding:8px 16px; font-size:13px;">Go</button>
+</form>
+
+<div class="note" style="border-left:3px solid var(--gold); padding-left:12px;">
+  <b>This is not real betting odds and this app does not accept wagers.</b> These are modeled win
+  probabilities from each team's own Pythagorean win% run through the Log5 formula (Bill James), with a
+  home-field adjustment derived from this league's own actual home/away split. No market data, no vig,
+  no injury reports, no weather, no line movement &mdash; a statistical estimate only, and a noisy one at
+  that given how short this league's season is. See <span class="mono">betting_odds.py</span> for the
+  exact model.
+</div>
+
+{% if odds.home_field %}
+<div class="section-sub" style="margin-top:14px;">
+  Home-field factor: {{ odds.home_field.win_pct|fmt3 }}
+  {% if odds.home_field.is_derived %}
+    (derived from {{ odds.home_field.games }} completed league games this season)
+  {% else %}
+    (fallback MLB-average estimate &mdash; not enough completed league games yet to derive this league's own number)
+  {% endif %}
+</div>
+{% endif %}
+
+{% if not odds.games %}
+  <div class="empty-state" style="margin-top:20px;">No not-yet-played games with enough data found for this date.</div>
+{% else %}
+<table class="stat-table" style="margin-top:16px;">
+  <thead><tr>
+    <th>Matchup</th><th>Team Pythag %</th><th>Moneyline Win %</th><th>Moneyline Odds</th>
+    <th>Run Line</th><th>Cover %</th><th>Cover Odds</th>
+    <th>Total</th><th>O/U %</th><th>O/U Odds</th>
+  </tr></thead>
+  <tbody>
+    {% for g in odds.games %}
+    <tr>
+      <td><a class="player-link" href="{{ url_for('team_roster', team_name=g.away_team) }}">{{ g.away_team }}</a> @ <a class="player-link" href="{{ url_for('team_roster', team_name=g.home_team) }}"><b>{{ g.home_team }}</b></a></td>
+      <td>{{ g.away_pythagorean|fmt3 }} / {{ g.home_pythagorean|fmt3 }}</td>
+      <td>{{ (g.away_win_pct * 100)|round(1) }}% / {{ (g.home_win_pct * 100)|round(1) }}%</td>
+      <td>{{ '%+d'|format(g.away_odds) }} / {{ '%+d'|format(g.home_odds) }}</td>
+      {% if g.run_line is defined %}
+      <td>{{ '%+.1f'|format(-g.run_line) }} / {{ '%+.1f'|format(g.run_line) }}</td>
+      <td>{{ (g.away_cover_prob * 100)|round(1) }}% / {{ (g.home_cover_prob * 100)|round(1) }}%</td>
+      <td>{{ '%+d'|format(g.away_cover_odds) }} / {{ '%+d'|format(g.home_cover_odds) }}</td>
+      <td>{{ g.total_line }}</td>
+      <td>O {{ (g.over_prob * 100)|round(1) }}% / U {{ (g.under_prob * 100)|round(1) }}%</td>
+      <td>{{ '%+d'|format(g.over_odds) }} / {{ '%+d'|format(g.under_odds) }}</td>
+      {% else %}
+      <td colspan="5" class="empty-state">Run-scoring data unavailable for this matchup</td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="note">
+  Format throughout is Away / Home. Run Line shows each side's spread (e.g. away +1.5 / home -1.5 means
+  home is favored to win by 2+); Cover % is the modeled probability of beating that specific number, not
+  of winning outright. Total is the modeled combined-runs line; O/U % is the modeled probability of
+  going over or under it. Both use a normal approximation around the modeled expected margin/total, with
+  a standard deviation derived from this league's own actual game-to-game results
+  ({{ odds.run_stats.games if odds.run_stats else 0 }} games) rather than an assumed number -- real
+  per-game run differential is a discrete, somewhat skewed quantity, so this is a reasonable
+  simplification, not an exact model. A game only appears here if both teams have a Pythagorean win% on
+  record (i.e. at least one completed game each this season) &mdash; a brand-new team with zero games
+  played has no responsible estimate to show yet.
+</div>
+{% endif %}
+{% endblock %}
