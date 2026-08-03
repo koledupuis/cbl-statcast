@@ -1,5 +1,83 @@
 # CBL Stats
 
+## /betting: added run line (spread) and total runs (over/under)
+
+Two more markets alongside the existing moneyline, using the same
+"derive from real league data" philosophy as the home-field number.
+
+**Run line:** expected margin from each team's runs-per-game
+scored/allowed, run through a normal approximation using the
+league's own empirically-derived game-to-game run-differential
+standard deviation (`league_run_stats`, computed directly from every
+completed game's actual final score, not an assumed number) --
+falls back to a rough MLB-scale constant only until there are enough
+league games to trust a derived one.
+
+**Total runs:** same approach for combined runs, with a line set at
+the modeled expected total rounded to the nearest 0.5 (standard
+sportsbook convention, avoids a push).
+
+Both explicitly documented as a normal-approximation simplification,
+not an exact model -- real per-game run differential is a discrete,
+somewhat skewed quantity, closer to a Skellam distribution than a
+clean bell curve.
+
+**A real bug caught by testing, same shape as last time.** The
+run-differential sign needs normalizing to "home minus away"
+regardless of which team's own `game_results` entry gets captured
+for a shared game (the away team's entry has the runs in ITS OWN
+perspective, which is the mirror image). Wrote a test specifically
+using an away-team-perspective entry to confirm the sign comes out
+right, rather than trusting a same-shape test to symmetric data. Also
+caught and fixed a mistake in my OWN test fixture along the way (I'd
+initially left `result` out of a constructed `game_results` entry
+that needed it, which briefly made the home-field number compute as
+0.0 and threw off an otherwise-correct win probability) -- worth
+noting since it wasn't a bug in the app, just in the test data, and
+the real code was right the whole time.
+
+
+## New: hidden /betting page -- modeled win probabilities, not real odds
+
+Unlisted page at `/betting` (no link anywhere in the site's own nav,
+reachable only by navigating there directly) showing modeled win
+probabilities for the day's not-yet-played games.
+
+**Model:** the Log5 formula (Bill James), using each team's
+Pythagorean win% (already computed per team elsewhere on this site,
+less noisy than raw record over a short season), with a home-field
+adjustment derived from this league's own actual home/away split --
+not an assumed MLB-style ~54%, an actual number computed from
+`game_results` across every team (deduped, since a shared game
+appears in both teams' own result lists) -- falling back to the MLB
+figure only until the league has enough completed games of its own
+(`MIN_GAMES_FOR_HOME_FIELD_CALC`) to trust a derived number.
+
+**Explicitly not real betting odds**, and the page says so directly:
+no market data, no vig, no injury reports, no weather, no line
+movement -- a statistical curiosity only, and the page carries a
+visible disclaimer saying exactly that.
+
+**A real bug caught during testing:** the home-field calculation
+originally checked each game_results entry's own `is_home` +
+`result` fields directly, which is only correct if you happen to
+capture the HOME team's entry for a shared game -- capturing the
+AWAY team's entry instead (equally likely, entries are deduped by
+whichever team gets processed first) would silently invert the
+count for that game. Fixed to determine "did the home team win"
+from either side's entry equivalently, and caught this specifically
+by testing a scenario deliberately designed to capture a mix of both
+teams' entries for shared games -- a naive test using only
+symmetric/matching data wouldn't have caught it.
+
+Also unit-tested the Log5 formula and American-odds conversion
+against hand-calculated values (a .700 team vs a .300 team, 50/50
+teams, and clamped extreme cases), and the full daily-odds builder
+against a scenario with completed games, wrong-date games, and the
+one real correctly-scheduled matchup mixed together, confirming only
+the right game surfaces.
+
+
 ## Reverted: gameDuration-based obscure stats (data quality issue)
 
 Both "Most Hours of Baseball Played" and "Longest Games" are removed,

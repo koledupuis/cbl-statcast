@@ -7,6 +7,7 @@ Then visit http://localhost:5000
 """
 from flask import Flask, render_template, abort, request, redirect, url_for, jsonify, send_file
 from markupsafe import Markup, escape
+import datetime
 
 import analytics
 import baserunning
@@ -27,6 +28,7 @@ import splits as player_splits
 import stats
 import obscure_stats
 import stadiums
+import betting_odds
 import team_schedule
 import transactions
 
@@ -1317,6 +1319,22 @@ def game_page(public_game_id):
         pitching_box=gameday.build_pitching_box(gd, lookup),
         play_by_play=gameday.build_play_by_play(gd, lookup),
     )
+
+
+@app.route("/betting")
+def betting_odds_page():
+    """Deliberately unlisted -- reachable only by navigating to
+    /betting directly, no link anywhere in the site's own nav. Shows
+    MODELED win probabilities for the day's not-yet-played games,
+    NOT real betting odds -- see betting_odds.py's module docstring
+    for exactly what this is and isn't (no market data, no real
+    wagering, a curiosity feature only)."""
+    target_date = (request.args.get("date") or "").strip() or datetime.date.today().isoformat()
+    try:
+        odds = betting_odds.build_daily_odds(target_date)
+    except Exception:
+        odds = {"date": target_date, "home_field": None, "games": []}
+    return render_template("betting.html", odds=odds, target_date=target_date)
 
 
 if __name__ == "__main__":
