@@ -12,12 +12,17 @@
 </form>
 
 <div class="note" style="border-left:3px solid var(--gold); padding-left:12px;">
-  <b>This is not real betting odds and this app does not accept wagers.</b> These are modeled win
-  probabilities from each team's own Pythagorean win% run through the Log5 formula (Bill James), with a
-  home-field adjustment derived from this league's own actual home/away split. No market data, no vig,
-  no injury reports, no weather, no line movement &mdash; a statistical estimate only, and a noisy one at
-  that given how short this league's season is. See <span class="mono">betting_odds.py</span> for the
-  exact model.
+  <b>This is not real betting odds and this app does not accept wagers.</b> "Win %" columns are the
+  model's honest true estimate (from each team's own Pythagorean win% run through the Log5 formula, with
+  a home-field adjustment derived from this league's own actual home/away split, and a modest
+  head-to-head adjustment based on this season's series between the two specific teams -- weighted down
+  significantly since a season series is a much smaller, noisier sample than either team's full record).
+  The "Odds" columns
+  apply a representative sportsbook-style vig on top of that estimate so the numbers look like an actual
+  posted line rather than a raw probability -- that vig figure is illustrative, not scraped from any real
+  book, and won't track FanDuel's actual current pricing. Still no real market data, no injury reports,
+  no weather, no line movement &mdash; a statistical estimate only, and a noisy one at that given how
+  short this league's season is. See <span class="mono">betting_odds.py</span> for the exact model.
 </div>
 
 {% if odds.home_field %}
@@ -36,7 +41,7 @@
 {% else %}
 <table class="stat-table" style="margin-top:16px;">
   <thead><tr>
-    <th>Matchup</th><th>Team Pythag %</th><th>Moneyline Win %</th><th>Moneyline Odds</th>
+    <th>Matchup</th><th>Season Series</th><th>Team Pythag %</th><th>Moneyline Win %</th><th>Moneyline Odds</th>
     <th>Run Line</th><th>Cover %</th><th>Cover Odds</th>
     <th>Total</th><th>O/U %</th><th>O/U Odds</th>
   </tr></thead>
@@ -44,6 +49,13 @@
     {% for g in odds.games %}
     <tr>
       <td><a class="player-link" href="{{ url_for('team_roster', team_name=g.away_team) }}">{{ g.away_team }}</a> @ <a class="player-link" href="{{ url_for('team_roster', team_name=g.home_team) }}"><b>{{ g.home_team }}</b></a></td>
+      <td>
+        {% if g.head_to_head and g.head_to_head.games %}
+          {{ g.home_team }} {{ g.head_to_head.team_a_wins }}-{{ g.head_to_head.team_b_wins }}
+        {% else %}
+          No meetings yet
+        {% endif %}
+      </td>
       <td>{{ g.away_pythagorean|fmt3 }} / {{ g.home_pythagorean|fmt3 }}</td>
       <td>{{ (g.away_win_pct * 100)|round(1) }}% / {{ (g.home_win_pct * 100)|round(1) }}%</td>
       <td>{{ '%+d'|format(g.away_odds) }} / {{ '%+d'|format(g.home_odds) }}</td>
