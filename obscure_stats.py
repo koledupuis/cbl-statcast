@@ -64,7 +64,7 @@ def _hr_less_ip_streak_outs(game_log):
     return total_outs
 
 
-def build_most_ip_without_hr():
+def build_most_ip_without_hr(limit=TOP_N):
     """Top 5: current active streak of innings pitched without
     allowing a home run, among pitchers with at least MIN_IP_FOR_STREAK
     innings pitched this season. One game-log walk per qualifying
@@ -90,10 +90,10 @@ def build_most_ip_without_hr():
         })
 
     results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
+    return results[:limit]
 
 
-def build_longest_scoreless_streak():
+def build_longest_scoreless_streak(limit=TOP_N):
     """Top 5: current active streak of consecutive scoreless
     appearances, among pitchers with at least MIN_IP_FOR_STREAK innings
     pitched this season. Reuses pitching_splits.build_pitcher_scoreless_streak
@@ -120,10 +120,10 @@ def build_longest_scoreless_streak():
         })
 
     results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
+    return results[:limit]
 
 
-def build_longest_hit_streak():
+def build_longest_hit_streak(limit=TOP_N):
     """Top 5: current active hit streak, among batters with at least
     MIN_PA_FOR_STREAK plate appearances this season. Reuses
     rolling.build_rolling_stats' own "hit_streak" field -- a plain
@@ -151,10 +151,10 @@ def build_longest_hit_streak():
         })
 
     results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
+    return results[:limit]
 
 
-def build_longest_onbase_streak():
+def build_longest_onbase_streak(limit=TOP_N):
     """Top 5: current active streak of consecutive games reaching base
     (hit, walk, or HBP -- anything counted in rolling.py's own
     "on_base_streak" field), among batters with at least
@@ -185,10 +185,10 @@ def build_longest_onbase_streak():
         })
 
     results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
+    return results[:limit]
 
 
-def build_highest_iso():
+def build_highest_iso(limit=TOP_N):
     """Top 5: Isolated Power (SLG - AVG) -- how much of a hitter's
     slugging comes from extra bases specifically, stripped of the
     part AVG already covers. Pure season-row arithmetic, no game-log
@@ -207,10 +207,10 @@ def build_highest_iso():
             "value": stats.fmt3(slg - avg), "sort_key": slg - avg,
         })
     results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
+    return results[:limit]
 
 
-def build_best_bb_k_ratio():
+def build_best_bb_k_ratio(limit=TOP_N):
     """Top 5: walk-to-strikeout ratio (BB/K) for batters -- plate
     discipline distilled to one number. Pure season-row arithmetic.
     Requires at least 1 strikeout on record (undefined/infinite
@@ -229,10 +229,10 @@ def build_best_bb_k_ratio():
             "value": stats.fmt2(ratio), "sort_key": ratio,
         })
     results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
+    return results[:limit]
 
 
-def build_best_k_bb_ratio():
+def build_best_k_bb_ratio(limit=TOP_N):
     """Top 5: strikeout-to-walk ratio (K/BB) for pitchers -- swing-and-
     miss stuff with control both accounted for in one number. Pure
     season-row arithmetic. Requires at least 1 walk allowed on record
@@ -251,10 +251,10 @@ def build_best_k_bb_ratio():
             "value": stats.fmt2(ratio), "sort_key": ratio,
         })
     results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
+    return results[:limit]
 
 
-def build_highest_babip():
+def build_highest_babip(limit=TOP_N):
     """Top 5: BABIP (batting average on balls actually put in play,
     strips out strikeouts and home runs) -- how much of a hitter's
     average comes from balls finding grass versus swing-and-miss or
@@ -275,10 +275,10 @@ def build_highest_babip():
             "value": stats.fmt3(babip), "sort_key": babip,
         })
     results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
+    return results[:limit]
 
 
-def build_best_contact_rate():
+def build_best_contact_rate(limit=TOP_N):
     """Top 5: Contact Rate (1 - SO/PA) -- how often a hitter puts the
     ball in play (or reaches some other way) rather than striking
     out, regardless of what happens after contact. Pure season-row
@@ -296,10 +296,10 @@ def build_best_contact_rate():
             "value": stats.fmt_pct(rate), "sort_key": rate,
         })
     results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
+    return results[:limit]
 
 
-def build_best_gb_fb_ratio():
+def build_best_gb_fb_ratio(limit=TOP_N):
     """Top 5: groundball-to-flyball ratio -- pitchers who keep the
     ball on the ground the most, relative to fly balls allowed (a
     real, if old-school, scouting-report descriptor: "he's a
@@ -319,7 +319,7 @@ def build_best_gb_fb_ratio():
             "value": stats.fmt2(ratio), "sort_key": ratio,
         })
     results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
+    return results[:limit]
 
 
 def _count_runners_on_base(before):
@@ -332,7 +332,7 @@ def _count_runners_on_base(before):
     return sum(1 for base in ("first", "second", "third") if before.get(base))
 
 
-def build_most_runners_stranded():
+def build_most_runners_stranded(limit=TOP_N):
     """Top 5: runners left on base (LOB) charged to the BATTER -- the
     real, official definition, not an approximation: for each plate
     appearance where the batter's OWN at-bat produces the half-
@@ -413,10 +413,10 @@ def build_most_runners_stranded():
             "value": str(stranded), "sort_key": stranded,
         })
     results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
+    return results[:limit]
 
 
-def build_most_times_left_on_base():
+def build_most_times_left_on_base(limit=TOP_N):
     """Top 5: how many times a player has personally been left on
     base AS A RUNNER when a half-inning ended -- the complementary
     stat to Most Runners Left On Base just above (that one credits
@@ -494,10 +494,10 @@ def build_most_times_left_on_base():
             "value": str(count), "sort_key": count,
         })
     results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
+    return results[:limit]
 
 
-def build_most_team_lob():
+def build_most_team_lob(limit=TOP_N):
     """Top 5 TEAMS (not players) by total runners left on base this
     season -- the standard "Team LOB" number shown in every real box
     score, aggregated across the whole season rather than one game.
@@ -564,10 +564,10 @@ def build_most_team_lob():
             "value": str(total), "sort_key": total,
         })
     results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
+    return results[:limit]
 
 
-def build_most_total_bases():
+def build_most_total_bases(limit=TOP_N):
     """Top 5: total bases (1 for a single, 2 for a double, 3 for a
     triple, 4 for a home run) -- a cumulative power/production number
     distinct from home run count alone, since it also credits doubles
@@ -590,10 +590,10 @@ def build_most_total_bases():
             "value": str(tb), "sort_key": tb,
         })
     results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
+    return results[:limit]
 
 
-def build_highest_walk_rate():
+def build_highest_walk_rate(limit=TOP_N):
     """Top 5: Walk Rate (BB/PA) -- how often a hitter's plate
     appearance ends in a walk specifically, as a share of every trip
     to the plate. Distinct framing from the BB/K ratio category above
@@ -613,65 +613,91 @@ def build_highest_walk_rate():
             "value": stats.fmt_pct(rate), "sort_key": rate,
         })
     results.sort(key=lambda e: e["sort_key"], reverse=True)
-    return results[:TOP_N]
+    return results[:limit]
+
+
+DETAIL_LIMIT = 50  # how many rows a single-category detail page shows, vs TOP_N=5 on the summary page
+
+# Single source of truth for every category on the Obscure Stats page --
+# both build_all_obscure_stats (the summary page, top 5 each) and
+# build_single_obscure_stat (a full leaderboard for one category, used
+# by the "click the headline" detail view) read from this same list,
+# so there's exactly one place that defines what categories exist and
+# what each one is called/does.
+OBSCURE_STAT_CATEGORIES = [
+    {"slug": "ip-without-hr", "title": "Most IP Without Allowing a HR (Active Streak)",
+     "subtitle": "Pitchers currently working the longest streak of innings without giving one up",
+     "builder": build_most_ip_without_hr},
+    {"slug": "scoreless-streak", "title": "Longest Active Scoreless Streak",
+     "subtitle": "Consecutive appearances in a row without allowing a run, right now",
+     "builder": build_longest_scoreless_streak},
+    {"slug": "hit-streak", "title": "Longest Active Hit Streak",
+     "subtitle": "Consecutive games in a row with a hit, right now",
+     "builder": build_longest_hit_streak},
+    {"slug": "onbase-streak", "title": "Longest Active On-Base Streak",
+     "subtitle": "Consecutive games in a row reaching base -- hit, walk, or HBP -- right now",
+     "builder": build_longest_onbase_streak},
+    {"slug": "iso", "title": "Highest Isolated Power (ISO)",
+     "subtitle": "SLG minus AVG -- how much of a hitter's slugging is extra bases, not just hits",
+     "builder": build_highest_iso},
+    {"slug": "babip", "title": "Highest BABIP",
+     "subtitle": "Batting average on balls actually put in play -- strips out strikeouts and homers entirely",
+     "builder": build_highest_babip},
+    {"slug": "contact-rate", "title": "Best Contact Rate",
+     "subtitle": "How often a hitter puts the ball in play instead of striking out, regardless of the result",
+     "builder": build_best_contact_rate},
+    {"slug": "total-bases", "title": "Most Total Bases",
+     "subtitle": "1 for a single, 2 for a double, 3 for a triple, 4 for a home run -- credits doubles and triples a HR count alone would ignore",
+     "builder": build_most_total_bases},
+    {"slug": "walk-rate", "title": "Highest Walk Rate",
+     "subtitle": "Share of plate appearances that end in a walk",
+     "builder": build_highest_walk_rate},
+    {"slug": "bb-k-ratio", "title": "Best BB/K Ratio (Batting)",
+     "subtitle": "Walks per strikeout -- plate discipline in one number",
+     "builder": build_best_bb_k_ratio},
+    {"slug": "k-bb-ratio", "title": "Best K/BB Ratio (Pitching)",
+     "subtitle": "Strikeouts per walk -- swing-and-miss stuff with control, both at once",
+     "builder": build_best_k_bb_ratio},
+    {"slug": "gb-fb-ratio", "title": "Best GB/FB Ratio (Pitching)",
+     "subtitle": "Groundballs per flyball allowed -- the old-school \"groundball pitcher\" label, quantified",
+     "builder": build_best_gb_fb_ratio},
+    {"slug": "runners-stranded", "title": "Most Runners Left On Base",
+     "subtitle": "Runners stranded on the batter's own inning-ending out -- the official LOB definition, not just any out with runners on",
+     "builder": build_most_runners_stranded},
+    {"slug": "times-left-on-base", "title": "Most Times Left On Base",
+     "subtitle": "The flip side -- how often a player has personally been the runner stranded when the inning ended",
+     "builder": build_most_times_left_on_base},
+    {"slug": "team-lob", "title": "Most Runners Left On Base (Team)",
+     "subtitle": "The standard \"Team LOB\" box score number, totaled across the whole season",
+     "builder": build_most_team_lob},
+]
 
 
 def build_all_obscure_stats():
-    """Every leaderboard on the page, each independently wrapped so
-    one failing category (e.g. a broken game-log fetch) doesn't take
-    the others down with it."""
-    categories = [
-        ("Most IP Without Allowing a HR (Active Streak)",
-         "Pitchers currently working the longest streak of innings without giving one up",
-         build_most_ip_without_hr),
-        ("Longest Active Scoreless Streak",
-         "Consecutive appearances in a row without allowing a run, right now",
-         build_longest_scoreless_streak),
-        ("Longest Active Hit Streak",
-         "Consecutive games in a row with a hit, right now",
-         build_longest_hit_streak),
-        ("Longest Active On-Base Streak",
-         "Consecutive games in a row reaching base -- hit, walk, or HBP -- right now",
-         build_longest_onbase_streak),
-        ("Highest Isolated Power (ISO)",
-         "SLG minus AVG -- how much of a hitter's slugging is extra bases, not just hits",
-         build_highest_iso),
-        ("Highest BABIP",
-         "Batting average on balls actually put in play -- strips out strikeouts and homers entirely",
-         build_highest_babip),
-        ("Best Contact Rate",
-         "How often a hitter puts the ball in play instead of striking out, regardless of the result",
-         build_best_contact_rate),
-        ("Most Total Bases",
-         "1 for a single, 2 for a double, 3 for a triple, 4 for a home run -- credits doubles and triples a HR count alone would ignore",
-         build_most_total_bases),
-        ("Highest Walk Rate",
-         "Share of plate appearances that end in a walk",
-         build_highest_walk_rate),
-        ("Best BB/K Ratio (Batting)",
-         "Walks per strikeout -- plate discipline in one number",
-         build_best_bb_k_ratio),
-        ("Best K/BB Ratio (Pitching)",
-         "Strikeouts per walk -- swing-and-miss stuff with control, both at once",
-         build_best_k_bb_ratio),
-        ("Best GB/FB Ratio (Pitching)",
-         "Groundballs per flyball allowed -- the old-school \"groundball pitcher\" label, quantified",
-         build_best_gb_fb_ratio),
-        ("Most Runners Left On Base",
-         "Runners stranded on the batter's own inning-ending out -- the official LOB definition, not just any out with runners on",
-         build_most_runners_stranded),
-        ("Most Times Left On Base",
-         "The flip side -- how often a player has personally been the runner stranded when the inning ended",
-         build_most_times_left_on_base),
-        ("Most Runners Left On Base (Team)",
-         "The standard \"Team LOB\" box score number, totaled across the whole season",
-         build_most_team_lob),
-    ]
+    """Every leaderboard on the summary page, top TOP_N each, each
+    independently wrapped so one failing category (e.g. a broken
+    game-log fetch) doesn't take the others down with it."""
     result = []
-    for title, subtitle, builder in categories:
+    for cat in OBSCURE_STAT_CATEGORIES:
         try:
-            rows = builder()
+            rows = cat["builder"](TOP_N)
         except Exception:
             rows = []
-        result.append({"title": title, "subtitle": subtitle, "rows": rows})
+        result.append({"title": cat["title"], "subtitle": cat["subtitle"], "rows": rows, "slug": cat["slug"]})
     return result
+
+
+def build_single_obscure_stat(slug, limit=DETAIL_LIMIT):
+    """One category's full leaderboard (DETAIL_LIMIT rows by default,
+    not just the summary page's top 5) -- powers the detail page a
+    category's headline links to. Returns None if slug doesn't match
+    any known category, so the route can 404 cleanly rather than
+    render an empty page for a typo'd or stale URL."""
+    for cat in OBSCURE_STAT_CATEGORIES:
+        if cat["slug"] == slug:
+            try:
+                rows = cat["builder"](limit)
+            except Exception:
+                rows = []
+            return {"title": cat["title"], "subtitle": cat["subtitle"], "rows": rows, "slug": slug}
+    return None

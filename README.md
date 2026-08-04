@@ -1,5 +1,33 @@
 # CBL Stats
 
+## Obscure Stats: click a headline for the full leaderboard (up to 50), not just the top 5
+
+Every category's headline on the summary page now links to a full
+leaderboard for that specific stat -- makes sense since every
+category was already being computed in full and then truncated to 5
+for the summary view; the rest of the data was just being thrown
+away.
+
+Refactored all 15 builder functions to accept an optional `limit`
+parameter (defaulting to `TOP_N=5`, same as before) instead of a
+hardcoded truncation, and consolidated what used to be an inline list
+inside `build_all_obscure_stats()` into a single module-level
+`OBSCURE_STAT_CATEGORIES` registry (slug, title, subtitle, builder)
+that both the summary page and the new detail lookup read from --
+one definition of what categories exist, not two.
+
+New `/leaderboard/obscure/<slug>` route (`build_single_obscure_stat`)
+shows up to 50 rows for one category, 404s cleanly on an unrecognized
+slug. New `obscure_stat_detail.html` template reuses the same
+player/team row-linking logic as the summary page's cards.
+
+Tested that the summary page still truncates to 5 while the detail
+page correctly shows all qualifying rows for a 10-candidate scenario,
+confirmed an invalid slug 404s instead of rendering an empty page, and
+spot-checked all 15 real category slugs resolve successfully end to
+end through the actual route.
+
+
 ## New: Most Runners Left On Base (Team) -- the standard box-score "Team LOB" number
 
 Third and final piece of the LOB trio on Obscure Stats -- the

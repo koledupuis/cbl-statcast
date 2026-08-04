@@ -225,6 +225,19 @@ def leaderboard_obscure():
     return render_template("obscure_stats.html", categories=categories, active="obscure")
 
 
+@app.route("/leaderboard/obscure/<slug>")
+def leaderboard_obscure_detail(slug):
+    """Full leaderboard (DETAIL_LIMIT rows) for ONE obscure-stat
+    category -- what a category's headline on the summary page links
+    to, since that page only ever shows the top 5 despite every
+    category already being computed in full. 404s on an unrecognized
+    slug rather than rendering an empty page."""
+    category = obscure_stats.build_single_obscure_stat(slug)
+    if category is None:
+        abort(404)
+    return render_template("obscure_stat_detail.html", category=category, active="obscure")
+
+
 @app.route("/leaderboard/stadiums")
 def leaderboard_stadiums():
     """League-wide batting stats by park -- both teams' hitters

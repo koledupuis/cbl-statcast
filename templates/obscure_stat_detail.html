@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ category.title }} &middot; CBL Stats{% endblock %}
+
+{% block content %}
+<div class="section-title">{{ category.title }}</div>
+<div class="section-sub">{{ category.subtitle }} &middot; <a href="{{ url_for('leaderboard_obscure') }}" style="color:inherit; text-decoration:underline;">&larr; Back to Obscure Stats</a></div>
+
+<div class="tabs">
+  <a href="{{ url_for('leaderboard_batting') }}" class="{{ 'active' if active=='batting' }}">Batting</a>
+  <a href="{{ url_for('leaderboard_pitching') }}" class="{{ 'active' if active=='pitching' }}">Pitching</a>
+  <a href="{{ url_for('leaderboard_fielding') }}" class="{{ 'active' if active=='fielding' }}">Fielding</a>
+  <a href="{{ url_for('leaderboard_stadiums') }}" class="{{ 'active' if active=='stadiums' }}">Stadiums</a>
+  <a href="{{ url_for('leaderboard_obscure') }}" class="{{ 'active' if active=='obscure' }}">Obscure</a>
+  <a href="{{ url_for('leaderboard_teams') }}" class="{{ 'active' if active=='teams' }}">Teams</a>
+</div>
+
+{% if not category.rows %}
+  <div class="empty-state" style="margin-top:20px;">No qualifying players right now.</div>
+{% else %}
+<table class="stat-table" style="margin-top:16px;">
+  <thead><tr><th>#</th><th>Player</th><th></th></tr></thead>
+  <tbody>
+    {% for r in category.rows %}
+    <tr>
+      <td class="rank-col">{{ loop.index }}</td>
+      <td>
+        {% if r.playerId %}
+        <a class="player-link" href="{{ url_for('player_page', player_id=r.playerId) }}">{{ r.name }}</a>
+        <span class="team-tag">{{ r.team }}</span>
+        {% else %}
+        <a class="player-link" href="{{ url_for('team_roster', team_name=r.team) }}"><b>{{ r.name }}</b></a>
+        {% endif %}
+      </td>
+      <td style="font-weight:700; text-align:right;">{{ r.value }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="note">
+  Full leaderboard for this category (up to 50 shown) -- the summary page only ever shows the top 5.
+</div>
+{% endif %}
+{% endblock %}

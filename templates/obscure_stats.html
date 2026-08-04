@@ -29,7 +29,9 @@
 <div class="obscure-grid">
   {% for cat in categories %}
   <div style="border:1px solid var(--paper-line); border-radius:4px; padding:14px 16px;">
-    <div class="section-title" style="margin-top:0; font-size:14px;">{{ cat.title }}</div>
+    <div class="section-title" style="margin-top:0; font-size:14px;">
+      <a href="{{ url_for('leaderboard_obscure_detail', slug=cat.slug) }}" style="color:inherit; text-decoration:none; border-bottom:1px dotted var(--ink-soft);">{{ cat.title }}</a>
+    </div>
     <div class="section-sub" style="margin-bottom:10px; font-size:11.5px;">{{ cat.subtitle }}</div>
     {% if not cat.rows %}
       <div class="empty-state" style="padding:14px 0;">No qualifying players right now.</div>
