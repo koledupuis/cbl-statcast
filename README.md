@@ -1,5 +1,185 @@
 # CBL Stats
 
+## New: Most Runners Left On Base (Team) -- the standard box-score "Team LOB" number
+
+Third and final piece of the LOB trio on Obscure Stats -- the
+standard "Team LOB" number every real box score shows, totaled across
+the whole season rather than one game. Same inning-ending-play
+detection as the two player-level LOB stats, crediting the stranded-
+runner count to the batting TEAM for that half-inning instead of any
+individual player (home if `halfInning` is "bottom", away if "top" --
+the same side convention used throughout this app).
+
+Also re-added the template's team-level row branch (link to the team
+roster page instead of a player page) -- this had been removed when
+an earlier team-level obscure stat was reverted for an unrelated data
+quality reason, so it needed restoring for this one.
+
+Tested with a two-game scenario specifically designed to catch a
+home/away mixup: one team is home in one game and away in the other,
+confirming their LOB total correctly sums across both regardless of
+which side they were on, and confirming a team with no qualifying
+innings in the test data is correctly absent rather than showing a
+false zero.
+
+
+## New: Most Times Left On Base -- the runner's-side complement to last session's LOB stat
+
+Credits the RUNNER(S) actually stranded by an inning-ending out,
+rather than the batter whose at-bat produced it (that's the existing
+"Most Runners Left On Base" from last session). Same inning-ending
+detection (walk each game's at-bats in order, track a running
+out-count per half-inning that resets on every change), but instead
+of counting how many runners were on base, identifies WHICH specific
+player occupied each base -- `baseRunnersBeforePlay` gives player IDs
+directly, and `runsScored` is also a list of specific player IDs
+(confirmed via `gameday.build_batting_box`'s own run-crediting logic,
+which reads it the same way) -- so each stranded runner is credited
+individually, correctly excluding whichever runner actually scored on
+that same play.
+
+Kept as its own independent full walk rather than sharing a pass with
+the batter-side stat, consistent with how other related-but-distinct
+pairs on this page already work.
+
+Tested the case that actually matters most for a stat like this:
+bases loaded, batter strikes out for the third out -- all three
+runners get individually credited, not just a count of three.
+Separately confirmed a runner who scores on the same play that ends
+the inning is correctly excluded, and a play that doesn't end the
+inning credits nobody at all.
+
+
+## New: Most Runners Left On Base (obscure stat), plus an environment recovery note
+
+**Environment note:** the working directory was found empty at the
+start of this session (a container/environment reset, unrelated to
+any of this project's own code). Recovered by unzipping the last
+delivered `cbl-stats.zip` from the outputs folder, confirmed intact
+via a quick regression check, then continued from there -- worth
+flagging in case any work between the last delivered zip and this
+reset needs re-checking, though nothing suggests it does.
+
+**New obscure stat: Most Runners Left On Base.** Uses the real,
+official definition of LOB charged to a batter -- runners on base at
+the start of the specific play where the batter's OWN at-bat produces
+the half-inning's THIRD out, and don't score on that play. Not an
+approximation like "runners on base whenever this batter made an
+out" -- a runner stranded on 2nd after a 1-out flyout doesn't count
+if the inning keeps going afterward.
+
+This needed a different approach than most other situational splits
+on this site: it requires walking each game's at-bats IN ORDER and
+tracking a running out-count per half-inning (resetting on every
+inning/half change), since "did this specific play end the inning"
+isn't knowable from looking at one at-bat record in isolation the way
+RISP or count-splits are. New `build_most_runners_stranded()` in
+`obscure_stats.py`, single-pass over the full season schedule,
+cross-referenced against season batting rows afterward for name/team
+and the usual min-PA qualification.
+
+Tested against a constructed multi-inning sequence covering every
+edge case that could go wrong: correct crediting on the actual
+3rd-out play, correct half-inning counter reset between innings
+(not carrying outs over from the previous half), a double play that
+jumps straight from 1 to 3 outs in one play, and specifically
+confirming a run that scores on the same play is NOT counted as
+stranded (a sac-fly-style RBI shouldn't inflate this stat) while a
+non-inning-ending play produces no credit at all even if it records
+multiple outs.
+
+
+## /betting now factors in this season's head-to-head record
+
+It didn't before -- checked the code directly rather than guess, and
+confirmed the model only used each team's own overall season strength.
+Added a real adjustment now.
+
+Found that `broadcast_notes.py` already had exactly the head-to-head
+logic needed (`_head_to_head`), just private and PDF-only. Moved it to
+`team_schedule.py` as a shared `head_to_head_record()` so both the PDF
+and the odds model use the same logic instead of two copies --
+`broadcast_notes.py` now calls the shared version.
+
+New `apply_head_to_head()` nudges the win probability toward how the
+home team has actually done against this specific opponent this
+season -- additive, same shape as the home-field fix, not a blend.
+Deliberately weighted down hard, though: a season series between two
+specific teams is a much smaller, noisier sample than either team's
+full record, so the weight scales up gradually with games played
+(`H2H_WEIGHT_SCALE`) and is capped modestly even with several meetings
+(`H2H_MAX_WEIGHT`) -- a 4-0 sweep nudges the estimate a handful of
+points, not to a lopsided blowout. No adjustment at all if the two
+teams haven't played yet this season, which is real, common, and
+different from "they're evenly matched."
+
+New "Season Series" column on the page shows the actual head-to-head
+record being used. Tested the adjustment function directly against
+hand-calculated values (no data, zero meetings, a sweep, a single
+game), and end-to-end confirmed two otherwise dead-even teams
+correctly show a modest favorite once a real season sweep is factored
+in.
+
+
+## /betting: fixed a real bug flattening every line toward 50/50, added realistic vig
+
+**Found the cause of everything looking close to even money.**
+`apply_home_field` was averaging the full Log5 team-strength estimate
+with the league's overall home-field win rate (a number naturally
+close to 50%) -- a 50/50 blend, not a small adjustment. That cuts a
+real team-strength signal roughly in half every time: a genuine 70%
+favorite came out looking like a 60% favorite, regardless of how
+lopsided the actual talent gap was. Changed it to an additive shift
+(add the home-field rate's deviation from 50%, a few points, rather
+than averaging the whole thing away). Verified directly: a
+constructed .650-vs-.350 Pythagorean matchup now correctly shows as a
+decisive ~78%/22% (roughly -427/+326), not the diluted, nearly-even
+numbers the old formula produced.
+
+**Added realistic sportsbook-style vig**, since a real book never
+posts a "true" 50/50 as +100/+100 -- it posts something like -110/-110.
+New `apply_vig()` scales two complementary probabilities up so they
+sum to a representative overround before converting to displayed
+American odds, applied to all three markets (moneyline, run line,
+totals). The page's own "Win %" columns still show the model's honest
+true estimate unvigged; only the "Odds" columns carry the vig, mirroring
+how a real book keeps its internal number separate from its posted
+price. Clearly labeled on the page as illustrative, not scraped from
+FanDuel's actual current pricing -- there's no way to keep this in
+sync with a real book automatically.
+
+
+## Fixed: /betting showed no games -- was using the wrong feed entirely
+
+Root cause: `_games_on_date` was built on `cbl_api.get_game_ids()` (the
+feed used everywhere else in this app), filtered by *excluding*
+`"completed"` rather than matching a specific not-yet-played status --
+a deliberately cautious choice at the time, since nothing in this
+codebase had ever confirmed what CBL calls a future game. Turns out
+the real gap was bigger: that feed was never confirmed to include
+not-yet-played games *at all*.
+
+You pointed at a real, dedicated schedule endpoint
+(`cbl.ca/api/stats-api/schedule`) that settles this directly -- a live
+payload confirms the actual status values used: `"scheduled"` for a
+future game, `"postponed"` for a rained-out one. Added
+`cbl_api.get_schedule()` for this feed, and rewrote `_games_on_date`
+to match `status == "scheduled"` directly (a real positive match now,
+not a guessed exclusion) against this feed instead. The schedule
+feed nests team info differently than get_game_ids (`{"name":...}`
+under `homeTeam`/`awayTeam` instead of a flat string), so
+`_games_on_date` normalizes that back to the flat shape the rest of
+`build_daily_odds` already expects -- nothing downstream needed to
+change.
+
+Tested against data matching the real confirmed schedule structure:
+confirmed a scheduled game for the target date shows up, and a
+postponed game plus a completed game (both present in the same
+response) are correctly excluded. Also confirmed end-to-end through
+the actual `/betting` route that a scheduled game now renders on the
+page.
+
+
 ## /betting: added run line (spread) and total runs (over/under)
 
 Two more markets alongside the existing moneyline, using the same

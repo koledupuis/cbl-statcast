@@ -21,6 +21,7 @@ Cost profile, stated plainly since this matters for a page like this:
 """
 import analytics
 import cbl_api
+import gameday
 import gamelog
 import pitching_splits
 import rolling
@@ -321,6 +322,251 @@ def build_best_gb_fb_ratio():
     return results[:TOP_N]
 
 
+def _count_runners_on_base(before):
+    """Count of baserunners occupying 1st/2nd/3rd from a
+    baseRunnersBeforePlay dict -- same base-occupancy shape used
+    elsewhere on this site (e.g. splits.py's RISP logic), just
+    counting occupied bases instead of checking one specific base."""
+    if not before:
+        return 0
+    return sum(1 for base in ("first", "second", "third") if before.get(base))
+
+
+def build_most_runners_stranded():
+    """Top 5: runners left on base (LOB) charged to the BATTER -- the
+    real, official definition, not an approximation: for each plate
+    appearance where the batter's OWN at-bat produces the half-
+    inning's THIRD out, credit that batter with however many runners
+    were on base at the start of that specific play and did not score
+    on it. This is deliberately NOT "every runner on base whenever
+    this batter made an out" -- a runner left on 2nd after a 1-out
+    flyout isn't "left on base" in the official sense if the inning
+    keeps going afterward; it only counts when the inning actually
+    ends on this specific play.
+
+    Requires walking each game's at-bats IN ORDER (unlike most other
+    situational splits on this site, which only need to look at each
+    play in isolation) and tracking a running out-count per half-
+    inning that resets whenever the inning or half-inning changes --
+    there's no way to know "did this specific play end the inning"
+    from a single at-bat record by itself.
+
+    Walks the full season schedule ONCE (gamelog._all_games -- every
+    game in the league), crediting whichever player was actually at
+    bat on the inning-ending play. Filtered to active, min-PA-
+    qualified batters at the end by cross-referencing season batting
+    rows, since this game-level walk has no season-total context of
+    its own."""
+    lob_by_player = {}  # player_id -> total runners stranded, across the whole season
+
+    for g in gamelog._all_games():
+        if gamelog._field(g, "status", default="") != "completed":
+            continue
+        public_id = gamelog._field(g, "publicGameId", "public_game_id", "public-game-id")
+        if not public_id:
+            continue
+        try:
+            gd = cbl_api.get_gameday(public_id)
+        except Exception:
+            continue
+        if not gd or not gd.get("snapshot"):
+            continue
+
+        current_key = None  # (inning, halfInning) -- resets the out counter on change
+        outs_this_half = 0
+        for ab in gameday.get_at_bats(gd):
+            if not ab.get("isComplete"):
+                continue
+            key = (ab.get("inning"), ab.get("halfInning"))
+            if key != current_key:
+                current_key = key
+                outs_this_half = 0
+
+            before_outs = outs_this_half
+            outs_this_half += ab.get("outsRecorded") or 0
+
+            if before_outs < 3 <= outs_this_half:
+                # This specific play crossed the 3-out threshold --
+                # the batter here made (or was part of) the inning-
+                # ending out.
+                runners_before = _count_runners_on_base(ab.get("baseRunnersBeforePlay"))
+                runs_scored = len(ab.get("runsScored") or [])
+                stranded = max(runners_before - runs_scored, 0)
+                if stranded > 0:
+                    batter_id = ab.get("batterId")
+                    if batter_id:
+                        lob_by_player[batter_id] = lob_by_player.get(batter_id, 0) + stranded
+
+    if not lob_by_player:
+        return []
+
+    all_batting = _filter_active(cbl_api.get_batting())
+    by_id = {r.get("playerId"): r for r in all_batting if r.get("playerId")}
+
+    results = []
+    for player_id, stranded in lob_by_player.items():
+        row = by_id.get(player_id)
+        if not row or (row.get("plateAppearances") or 0) < MIN_PA_FOR_RATE:
+            continue
+        results.append({
+            "playerId": player_id, "name": row.get("fullName"), "team": row.get("teamName"),
+            "value": str(stranded), "sort_key": stranded,
+        })
+    results.sort(key=lambda e: e["sort_key"], reverse=True)
+    return results[:TOP_N]
+
+
+def build_most_times_left_on_base():
+    """Top 5: how many times a player has personally been left on
+    base AS A RUNNER when a half-inning ended -- the complementary
+    stat to Most Runners Left On Base just above (that one credits
+    the BATTER whose own at-bat produces the inning-ending out; this
+    one credits the RUNNER(S) actually stranded by it).
+
+    Uses the exact same inning-ending-play detection as that stat
+    (walk each game's at-bats in order, track a running out-count per
+    half-inning that resets on every inning/half change -- see that
+    function's docstring for the full reasoning on why this can't be
+    determined from a single at-bat record in isolation). Deliberately
+    kept as its own independent full walk rather than sharing one pass
+    with build_most_runners_stranded -- consistent with how other
+    related-but-distinct streak pairs on this page (e.g. the HR-less
+    streak and the scoreless streak) are each their own walk on this
+    site; simplicity over micro-optimizing a second league-wide pass.
+
+    Where this differs mechanically: baseRunnersBeforePlay gives the
+    specific PLAYER ID occupying each base, not just an occupancy
+    count, and runsScored is also a list of specific player IDs (not
+    just a count) -- confirmed elsewhere on this site, e.g.
+    gameday.build_batting_box's own run-crediting loop reads it the
+    same way. That lets this credit the EXACT runner(s) left on base,
+    excluding whichever specific runner(s) actually scored on that
+    same play, rather than just a count of how many were stranded."""
+    times_stranded = {}  # player_id (as a runner) -> count of times personally left on base
+
+    for g in gamelog._all_games():
+        if gamelog._field(g, "status", default="") != "completed":
+            continue
+        public_id = gamelog._field(g, "publicGameId", "public_game_id", "public-game-id")
+        if not public_id:
+            continue
+        try:
+            gd = cbl_api.get_gameday(public_id)
+        except Exception:
+            continue
+        if not gd or not gd.get("snapshot"):
+            continue
+
+        current_key = None
+        outs_this_half = 0
+        for ab in gameday.get_at_bats(gd):
+            if not ab.get("isComplete"):
+                continue
+            key = (ab.get("inning"), ab.get("halfInning"))
+            if key != current_key:
+                current_key = key
+                outs_this_half = 0
+
+            before_outs = outs_this_half
+            outs_this_half += ab.get("outsRecorded") or 0
+
+            if before_outs < 3 <= outs_this_half:
+                before = ab.get("baseRunnersBeforePlay") or {}
+                scorers = set(ab.get("runsScored") or [])
+                for base in ("first", "second", "third"):
+                    runner_id = before.get(base)
+                    if runner_id and runner_id not in scorers:
+                        times_stranded[runner_id] = times_stranded.get(runner_id, 0) + 1
+
+    if not times_stranded:
+        return []
+
+    all_batting = _filter_active(cbl_api.get_batting())
+    by_id = {r.get("playerId"): r for r in all_batting if r.get("playerId")}
+
+    results = []
+    for player_id, count in times_stranded.items():
+        row = by_id.get(player_id)
+        if not row or (row.get("plateAppearances") or 0) < MIN_PA_FOR_RATE:
+            continue
+        results.append({
+            "playerId": player_id, "name": row.get("fullName"), "team": row.get("teamName"),
+            "value": str(count), "sort_key": count,
+        })
+    results.sort(key=lambda e: e["sort_key"], reverse=True)
+    return results[:TOP_N]
+
+
+def build_most_team_lob():
+    """Top 5 TEAMS (not players) by total runners left on base this
+    season -- the standard "Team LOB" number shown in every real box
+    score, aggregated across the whole season rather than one game.
+
+    Uses the exact same inning-ending-play detection as
+    build_most_runners_stranded and build_most_times_left_on_base
+    just above (walk each game's at-bats in order, track a running
+    out-count per half-inning that resets on every change -- see
+    those functions' docstrings for the full reasoning), but credits
+    the stranded-runner COUNT to the batting TEAM for that half-
+    inning rather than to any individual player. Batting team is
+    home if halfInning is "bottom", away if "top" -- the same
+    convention used throughout this app (gameday.py's own side
+    determination for batting box scores works the same way).
+
+    Kept as its own independent full walk rather than sharing a pass
+    with the two player-level LOB stats, consistent with how every
+    other related-but-distinct stat pairing on this page already
+    works."""
+    lob_by_team = {}  # team_name -> total runners left on base
+
+    for g in gamelog._all_games():
+        if gamelog._field(g, "status", default="") != "completed":
+            continue
+        public_id = gamelog._field(g, "publicGameId", "public_game_id", "public-game-id")
+        if not public_id:
+            continue
+        try:
+            gd = cbl_api.get_gameday(public_id)
+        except Exception:
+            continue
+        if not gd or not gd.get("snapshot"):
+            continue
+
+        home = gamelog._field(g, "homeTeam", "home_team", "home-team")
+        away = gamelog._field(g, "awayTeam", "away_team", "away-team")
+
+        current_key = None
+        outs_this_half = 0
+        for ab in gameday.get_at_bats(gd):
+            if not ab.get("isComplete"):
+                continue
+            key = (ab.get("inning"), ab.get("halfInning"))
+            if key != current_key:
+                current_key = key
+                outs_this_half = 0
+
+            before_outs = outs_this_half
+            outs_this_half += ab.get("outsRecorded") or 0
+
+            if before_outs < 3 <= outs_this_half:
+                runners_before = _count_runners_on_base(ab.get("baseRunnersBeforePlay"))
+                runs_scored = len(ab.get("runsScored") or [])
+                stranded = max(runners_before - runs_scored, 0)
+                if stranded > 0:
+                    batting_team = home if (ab.get("halfInning") or "top") == "bottom" else away
+                    if batting_team:
+                        lob_by_team[batting_team] = lob_by_team.get(batting_team, 0) + stranded
+
+    results = []
+    for team_name, total in lob_by_team.items():
+        results.append({
+            "playerId": None, "name": team_name, "team": team_name,
+            "value": str(total), "sort_key": total,
+        })
+    results.sort(key=lambda e: e["sort_key"], reverse=True)
+    return results[:TOP_N]
+
+
 def build_most_total_bases():
     """Top 5: total bases (1 for a single, 2 for a double, 3 for a
     triple, 4 for a home run) -- a cumulative power/production number
@@ -411,6 +657,15 @@ def build_all_obscure_stats():
         ("Best GB/FB Ratio (Pitching)",
          "Groundballs per flyball allowed -- the old-school \"groundball pitcher\" label, quantified",
          build_best_gb_fb_ratio),
+        ("Most Runners Left On Base",
+         "Runners stranded on the batter's own inning-ending out -- the official LOB definition, not just any out with runners on",
+         build_most_runners_stranded),
+        ("Most Times Left On Base",
+         "The flip side -- how often a player has personally been the runner stranded when the inning ended",
+         build_most_times_left_on_base),
+        ("Most Runners Left On Base (Team)",
+         "The standard \"Team LOB\" box score number, totaled across the whole season",
+         build_most_team_lob),
     ]
     result = []
     for title, subtitle, builder in categories:
